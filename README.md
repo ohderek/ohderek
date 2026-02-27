@@ -33,7 +33,6 @@ derek = {
         "bi":             ["Looker / LookML", "Tableau"],
         "quality":        ["Great Expectations", "dbt tests", "dbt_project_evaluator"],
     },
-    "currently_building": "GitHub Pipelines — DORA metrics platform",
 }
 ```
 
