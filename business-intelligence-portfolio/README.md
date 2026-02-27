@@ -8,7 +8,73 @@
 
 Interactive dashboards built in Tableau — publicly available, no login required.
 
-**[View my Tableau Portfolio →](https://public.tableau.com/app/profile/derek.o.halloran/viz/Portfolio_54/Story1)**
+**[View full portfolio story →](https://public.tableau.com/app/profile/derek.o.halloran/viz/Portfolio_54/Story1)**
+**[Browse all vizzes →](https://public.tableau.com/app/profile/derek.o.halloran/vizzes)**
+
+---
+
+### Featured Vizzes
+
+#### WorldWealthSankey ⭐ Featured
+*"If there was only $100 in the world — how would it be distributed?"*
+
+A Sankey flow diagram mapping global wealth distribution across regions. Highlights a striking insight: 12 individual nations each hold more wealth than the entire continent of Africa combined. Built using Tableau's flow/path chart type with custom colour encoding per region.
+
+**Skills demonstrated:** Sankey diagram construction, custom calculated fields for flow weighting, annotated insights, story-driven layout.
+
+---
+
+#### Food Delivery KPI Dashboard
+*Operational performance dashboard for a food delivery business*
+
+Multi-section KPI dashboard covering average market size, total sales, delivery time performance, food item metrics, and a sales vs back-order rate heat map calendar. Designed for operations managers who need a single-screen view of daily performance.
+
+**Skills demonstrated:** KPI scorecards, heat map calendar, dual-axis charts, cross-filter actions, parameter-driven date selection.
+
+---
+
+#### Messi vs Ronaldo
+*"Who is the greatest of all time?"*
+
+Head-to-head statistical comparison of Messi and Ronaldo's careers — goals, assists, and trophies across club and international competitions. Uses a mirrored bar chart layout to make direct comparison intuitive at a glance.
+
+**Skills demonstrated:** Custom layout design, mirrored bar charts, image integration, calculated career totals, tooltip customisation.
+
+---
+
+#### GDP & Happiness
+*"Are wealthier nations happier?"*
+
+Scatter plot exploring the relationship between GDP per capita and life satisfaction scores across countries. Applies k-means clustering to identify three distinct groups — revealing that beyond a wealth threshold, additional income has diminishing returns on happiness.
+
+**Skills demonstrated:** Scatter plot with cluster analysis, logarithmic axis scaling, reference band annotations, cluster labelling, statistical narrative.
+
+---
+
+#### Bridges to Prosperity
+*Bridging the gap across 22 nations*
+
+Impact dashboard for a humanitarian infrastructure programme — tracking 313 bridges built, 1.14M individuals served, and 19.57 km of total span across 22 nations. Combines a world map with country-level bar charts and KPI tiles.
+
+**Skills demonstrated:** Filled map + bar chart combination, KPI summary tiles, custom tooltips with impact metrics, map-to-chart filter actions.
+
+---
+
+#### Gender Pay Inequality
+*Tracking the gender pay gap over time*
+
+Area/line chart showing the evolution of the gender pay gap across multiple countries or sectors over time. Uses a diverging colour scheme (pink/blue) to make the gap immediately visible and highlights where progress has stalled.
+
+**Skills demonstrated:** Dual-series area charts, diverging colour palettes, trend annotations, time-series filtering, comparative storytelling.
+
+---
+
+#### Peaches and Nectarines Production
+*Global agricultural production analysis*
+
+World map and bar chart combination showing peach and nectarine production by country. Demonstrates geographic data visualisation alongside ranked bar charts to surface both spatial patterns and country-level rankings in a single view.
+
+**Skills demonstrated:** Filled map with custom colour scales, synchronized bar chart, parameter-driven measure switching, map zoom and filter interactions.
 
 ---
 
