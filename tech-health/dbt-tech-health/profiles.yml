@@ -1,0 +1,38 @@
+common: &common
+  type: snowflake
+
+analytics:
+  target: local
+  outputs:
+
+    # ── Unit testing (DuckDB, no Snowflake credentials needed) ───────────
+    unit_testing:
+      type: duckdb
+      path: "ci.duckdb"
+      database: ci
+      schema: main
+      threads: 1
+
+    # ── Local development ─────────────────────────────────────────────────
+    local:
+      <<: *common
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('USER') ~ '@example.com' }}"
+      role: "{{ env_var('USER') | upper }}"
+      authenticator: externalbrowser
+      database: "PERSONAL_{{ env_var('USER') | upper }}"
+      warehouse: "ADHOC__{{ env_var('WAREHOUSE', 'MEDIUM') }}"
+      schema: public
+      threads: 4
+
+    # ── Production (CI/CD managed) ────────────────────────────────────────
+    production:
+      <<: *common
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      private_key_path: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PATH') }}"
+      role: TRANSFORMER
+      database: ANALYTICS
+      warehouse: "ETL__{{ env_var('WAREHOUSE_SIZE', 'LARGE') }}"
+      schema: public
+      threads: 8

@@ -1,0 +1,64 @@
+name: 'analytics'
+version: '1.0.0'
+profile: 'analytics'
+
+model-paths:    ["models"]
+analysis-paths: ["analyses"]
+test-paths:     ["tests"]
+seed-paths:     ["seeds"]
+macro-paths:    ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  analytics:
+    staging:
+      +materialized: view
+      +schema: staging
+
+    intermediate:
+      +materialized: view
+      +schema: intermediate
+
+    marts:
+      +materialized: table
+      +persist_docs:
+        relation: true
+        columns: true
+
+      finance:
+        +schema: finance
+      marketing:
+        +schema: marketing
+      operations:
+        +schema: operations
+
+  # Governance package (enabled only in CI)
+  dbt_project_evaluator:
+    +enabled: "{{ var('dbt_project_evaluator_enabled', false) }}"
+    marts:
+      dag:
+        fct_rejoining_of_upstream_concepts:
+          +enabled: false
+
+vars:
+  dbt_project_evaluator_enabled: false
+  start_date: '2023-01-01'
+  data_interval_lookback_days: 3
+
+  # Source system identifiers
+  ecommerce_database: RAW
+  ecommerce_schema: ECOMMERCE
+
+seeds:
+  analytics:
+    dbt_project_evaluator_exceptions:
+      +enabled: "{{ var('dbt_project_evaluator_enabled', false) }}"
+
+data_tests:
+  +severity: warn
+  dbt_project_evaluator:
+    +severity: error

@@ -1,0 +1,87 @@
+version: 2
+
+models:
+  - name: fct_github__pull_requests
+    description: |
+      Central PR fact table. Canonical source for PR velocity, review coverage,
+      and DORA change frequency metrics.
+
+      **Grain:** One row per (org, pr_number).
+      **Incremental strategy:** Merge on pr_pk with 7-day cluster predicate.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [org, pr_number]
+      - dbt_utils.expression_is_true:
+          expression: "time_to_merge_epoch is null or time_to_merge_epoch >= 0"
+          where: "pr_created_date >= dateadd('day', -30, current_date())"
+    columns:
+      - name: pr_pk
+        description: "Surrogate primary key: md5(org | pr_number)."
+        tests: [not_null, unique]
+      - name: pr_number
+        description: PR number within the repository (natural key).
+        tests: [not_null]
+      - name: author_ldap
+        description: Internal LDAP identifier for the PR author. Null for bots.
+      - name: author_type
+        description: "'human' | 'bot' — derived from GitHub login pattern and identity resolution."
+        tests:
+          - accepted_values:
+              values: [human, bot]
+      - name: time_to_merge_epoch
+        description: "Seconds from PR creation to merge. NULL if not merged."
+      - name: time_to_review_epoch
+        description: "Seconds from PR creation to first human review (excluding self-reviews). NULL if no review."
+
+  - name: fct_github__lead_time_to_deploy
+    description: |
+      DORA Lead Time to Deploy. Matches merged PRs to their first production
+      deployment via a cascading SHA-match algorithm.
+
+      **Grain:** One row per (org, pr_number).
+      **Match scenarios:** exact_sha (best), staging_chain (fallback), or NULL (undeployed).
+    columns:
+      - name: pr_id
+        description: Foreign key to fct_github__pull_requests.
+        tests: [not_null, unique]
+      - name: lead_time_to_prod_hours
+        description: "Hours from PR creation to first production deployment. NULL if not yet deployed."
+      - name: merge_to_prod_hours
+        description: "Hours from PR merge to first production deployment."
+      - name: dora_lead_time_bucket
+        description: "DORA classification: elite (<1h) | high (<1d) | medium (<1w) | low (<6mo)."
+        tests:
+          - accepted_values:
+              values: [elite, high, medium, low]
+              config:
+                where: "is_deployed = true"
+      - name: match_scenario
+        description: "Algorithm used to match PR to deployment: exact_sha | staging_chain."
+      - name: is_deployed
+        description: True if a matching production deployment was found.
+
+  - name: dim_github__users
+    description: |
+      SCD Type 2 user dimension. Combines GitHub → LDAP identity resolution
+      with org hierarchy from the people system.
+
+      **Grain:** One row per (ldap, effective_start_date).
+      Use is_current = true for latest snapshot per engineer.
+    data_tests:
+      - dbt_utils.expression_is_true:
+          expression: "effective_start_date <= effective_end_date"
+    columns:
+      - name: user_pk
+        description: Surrogate primary key (dbt SCD2 id). Unique per historical record.
+        tests: [not_null, unique]
+      - name: ldap
+        description: Internal LDAP identifier for the engineer.
+        tests: [not_null]
+      - name: effective_start_date
+        description: Date this record version became active.
+        tests: [not_null]
+      - name: effective_end_date
+        description: "Date this record version was superseded. '9999-12-31' = current."
+        tests: [not_null]
+      - name: is_current
+        description: True for the latest record per LDAP.

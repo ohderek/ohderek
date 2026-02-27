@@ -1,0 +1,81 @@
+version: 2
+
+sources:
+  - name: ai_telemetry
+    description: Raw AI tool usage tables ingested from various tool APIs and internal systems.
+    database: RAW
+    schema: AI_TELEMETRY
+    freshness:
+      warn_after:  { count: 25, period: hour }
+      error_after: { count: 48, period: hour }
+    loaded_at_field: _loaded_at
+
+    tables:
+      - name: goose_endpoint_usage
+        description: Per-request logs from the Goose LLM proxy. request_time is in nanoseconds.
+        columns:
+          - name: requester
+            tests: [not_null]
+          - name: request_time
+            tests: [not_null]
+          - name: status_code
+            tests: [not_null]
+
+      - name: claude_code_usage
+        description: Daily Claude Code activity per user. Only user_actor rows are relevant.
+        columns:
+          - name: email
+            tests: [not_null]
+          - name: date
+            tests: [not_null]
+          - name: actor_type
+            tests:
+              - accepted_values:
+                  values: [user_actor, api_key_actor]
+
+      - name: cursor_usage
+        description: Daily Cursor IDE metrics per user.
+        columns:
+          - name: email
+            tests: [not_null]
+          - name: date
+            tests: [not_null]
+
+      - name: firebender_usage
+        description: Daily Firebender IDE activity per user.
+        columns:
+          - name: email
+            tests: [not_null]
+          - name: usage_date
+            tests: [not_null]
+
+      - name: amp_usage
+        description: Daily Amp coding assistant usage. user_email may have non-standard domains.
+        columns:
+          - name: user_email
+            tests: [not_null]
+          - name: date
+            tests: [not_null]
+
+      - name: chatgpt_usage
+        description: Weekly ChatGPT aggregate per user. Distributed across active days downstream.
+        columns:
+          - name: email
+            tests: [not_null]
+          - name: first_day_active_in_period
+            tests: [not_null]
+          - name: last_day_active_in_period
+            tests: [not_null]
+
+  - name: ai_telemetry_reporting
+    description: Intermediate reporting tables produced upstream (G2 user activity).
+    database: TECH_HEALTH
+    schema: REPORTING_TABLES
+    tables:
+      - name: int_g2_user_activity_daily
+        description: Daily user-level G2 LLM gateway activity, pre-aggregated.
+        columns:
+          - name: user_id
+            tests: [not_null]
+          - name: activity_date
+            tests: [not_null]

@@ -1,0 +1,84 @@
+version: 2
+
+sources:
+  - name: github
+    description: >
+      GitHub data replicated via Fivetran (pull_request, repository, review,
+      commit tables). Schema mirrors the GitHub REST API object model.
+    database: "{{ var('github_raw_database') }}"
+    schema:   "{{ var('github_raw_schema') }}"
+    freshness:
+      warn_after:  { count: 6,  period: hour }
+      error_after: { count: 24, period: hour }
+    loaded_at_field: _fivetran_synced
+
+    tables:
+      - name: pull_request
+        description: One row per pull request per org.
+        columns:
+          - name: id
+            tests: [not_null]
+          - name: number
+            tests: [not_null]
+          - name: repo_id
+            tests: [not_null]
+
+      - name: pull_request_review
+        description: Code review submissions on a PR.
+
+      - name: pull_request_review_comment
+        description: Individual inline review comments.
+
+      - name: issue_comment
+        description: PR conversation comments (non-review).
+
+      - name: commit
+        description: Commits pushed to the repo.
+
+      - name: commit_file
+        description: File-level diff records per commit.
+
+      - name: repository
+        description: Repository metadata.
+        columns:
+          - name: id
+            tests: [not_null, unique]
+
+      - name: label
+        description: PR and issue labels.
+
+      - name: pull_request_label
+        description: Bridge: pull requests to labels.
+
+  - name: identity
+    description: LDAP–GitHub username mapping tables (multi-source merged).
+    database: RAW
+    schema: IDENTITY
+    tables:
+      - name: user_lookup
+        description: >
+          Canonical GitHub username → LDAP mapping, deduplicated.
+          Built by merging Fivetran identity cache, manual mapping CSVs,
+          and user email → GitHub login join.
+        columns:
+          - name: ldap
+            tests: [not_null]
+          - name: github_login
+            tests: [not_null]
+
+  - name: deployments
+    description: Production deployment events from the internal deploy tracking system.
+    database: RAW
+    schema: DEPLOYMENTS
+    tables:
+      - name: deploy_events
+        description: One row per deployment event (staging and production).
+        columns:
+          - name: deploy_id
+            tests: [not_null, unique]
+          - name: commit_sha
+            tests: [not_null]
+          - name: environment
+            tests:
+              - accepted_values:
+                  values: [staging, production]

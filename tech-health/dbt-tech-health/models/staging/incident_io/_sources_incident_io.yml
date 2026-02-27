@@ -1,0 +1,59 @@
+version: 2
+
+sources:
+  - name: incident_io__companya
+    description: Incident.io CompanyA workspace replicated by Fivetran.
+    database: RAW
+    schema: incident_io__companya
+    tables:
+      - name: incident
+        description: Core incident records.
+        columns:
+          - name: id
+            tests: [not_null]
+          - name: reference
+            tests: [not_null, unique]
+          - name: status
+            tests: [not_null]
+          - name: severity
+            tests: [not_null]
+      - name: incident_times
+        description: Lifecycle timestamps per incident.
+      - name: roles
+        description: Role assignments per incident.
+
+  - name: incident_io__companyb
+    description: Incident.io CompanyB workspace replicated by Fivetran.
+    database: RAW
+    schema: incident_io__companyb
+    tables:
+      - name: incident
+        columns:
+          - name: id
+            tests: [not_null]
+          - name: reference
+            tests: [not_null, unique]
+      - name: incident_times
+      - name: roles
+
+  - name: incident_io__companyc
+    description: Incident.io CompanyC workspace replicated by Fivetran.
+    database: RAW
+    schema: incident_io__companyc
+    tables:
+      - name: incident
+        columns:
+          - name: id
+            tests: [not_null]
+          - name: reference
+            tests: [not_null, unique]
+      - name: incident_times
+      - name: roles
+
+  - name: ops_raw
+    description: Operational raw tables for incident-to-service linkage.
+    database: RAW
+    schema: OPS_RAW
+    tables:
+      - name: orig_service
+        description: Maps incident references to originating service names.

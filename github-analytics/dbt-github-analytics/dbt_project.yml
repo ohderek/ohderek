@@ -1,0 +1,53 @@
+name: 'github_analytics'
+version: '2.0.0'
+profile: 'github_analytics'
+
+model-paths:    ["models"]
+analysis-paths: ["analyses"]
+test-paths:     ["tests"]
+seed-paths:     ["seeds"]
+macro-paths:    ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  github_analytics:
+    staging:
+      +materialized: view
+      +schema: staging
+
+    intermediate:
+      +materialized: view
+      +schema: intermediate
+
+    marts:
+      +materialized: table
+      +persist_docs:
+        relation: true
+        columns: true
+
+      engineering_velocity:
+        +schema: engineering_velocity
+        +materialized: incremental
+
+      code_quality:
+        +schema: code_quality
+
+  dbt_project_evaluator:
+    +enabled: "{{ var('dbt_project_evaluator_enabled', false) }}"
+
+vars:
+  dbt_project_evaluator_enabled: false
+  github_raw_database: RAW
+  github_raw_schema: GITHUB
+
+  # Lead time matching — days to look back for a prod deployment
+  lead_time_lookback_days: 90
+
+data_tests:
+  +severity: warn
+  dbt_project_evaluator:
+    +severity: error
