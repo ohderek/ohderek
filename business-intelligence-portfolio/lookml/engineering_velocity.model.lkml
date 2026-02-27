@@ -10,7 +10,7 @@
 # the SCD2 user dimension for current-state team attribution.
 # ─────────────────────────────────────────────────────────────────────────────
 
-connection: "snowflake_github_analytics"
+connection: "snowflake_github_insights"
 
 # Include all views in this model
 include: "/views/*.view.lkml"

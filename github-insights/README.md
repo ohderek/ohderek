@@ -1,4 +1,4 @@
-# GitHub Pipelines
+# GitHub Insights
 
 > **Hypothetical Showcase:** Demonstrates two approaches to building an engineering velocity and DORA metrics platform on GitHub data — raw Snowflake SQL ETL jobs and a full dbt project. The ERD was designed from scratch and both implementations are production-grade patterns. All company names, org identifiers, and credentials are fully anonymised. No proprietary data is included.
 
@@ -120,7 +120,7 @@ Stage 7  Final assembly
 
 ---
 
-### Approach 2 — dbt Project ([`dbt-github-analytics/`](./dbt-github-analytics))
+### Approach 2 — dbt Project ([`dbt-github-insights/`](./dbt-github-insights))
 
 The same logic refactored as a dbt project. Benefits over raw SQL: Jinja templating removes multi-org duplication, schema tests enforce data contracts, `persist_docs` pushes column descriptions to Snowflake, and `incremental_predicates` prunes micro-partitions on large mart models.
 
@@ -256,11 +256,11 @@ CREATE TASK run_raw_migration
 pip install dbt-snowflake
 
 # Configure connection
-cp dbt-github-analytics/profiles.yml ~/.dbt/profiles.yml
+cp dbt-github-insights/profiles.yml ~/.dbt/profiles.yml
 # Edit profiles.yml with your Snowflake account, user, role, warehouse
 
 # Install packages
-cd dbt-github-analytics && dbt deps
+cd dbt-github-insights && dbt deps
 
 # Seed sources (user identity mapping)
 dbt seed

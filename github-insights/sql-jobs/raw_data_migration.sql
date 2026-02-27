@@ -1,7 +1,7 @@
 /*
   raw_data_migration.sql
   ─────────────────────────────────────────────────────────────────────────────
-  Hypothetical Showcase: Raw SQL ETL jobs for the GitHub Pipelines platform.
+  Hypothetical Showcase: Raw SQL ETL jobs for the GitHub Insights platform.
 
   Purpose : Consolidate GitHub pull request, review, commit, and repository
             data from multiple Fivetran connectors (multi-org) into unified

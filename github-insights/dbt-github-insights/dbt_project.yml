@@ -1,6 +1,6 @@
-name: 'github_analytics'
+name: 'github_insights'
 version: '2.0.0'
-profile: 'github_analytics'
+profile: 'github_insights'
 
 model-paths:    ["models"]
 analysis-paths: ["analyses"]
@@ -14,7 +14,7 @@ clean-targets:
   - "dbt_packages"
 
 models:
-  github_analytics:
+  github_insights:
     staging:
       +materialized: view
       +schema: staging

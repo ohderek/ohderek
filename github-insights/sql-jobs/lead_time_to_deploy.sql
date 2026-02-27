@@ -1,7 +1,7 @@
 /*
   lead_time_to_deploy.sql
   ─────────────────────────────────────────────────────────────────────────────
-  Hypothetical Showcase: DORA Lead Time to Deploy ETL for the GitHub Pipelines
+  Hypothetical Showcase: DORA Lead Time to Deploy ETL for the GitHub Insights
   platform.
 
   Purpose : Calculate the time from first commit → staging → production for

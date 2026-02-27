@@ -80,7 +80,7 @@ World map and bar chart combination showing peach and nectarine production by co
 
 ## LookML Examples ([`lookml/`](./lookml))
 
-LookML is Looker's modelling language — a YAML-like syntax that defines how Looker generates SQL, structures explores (the self-serve query interface), and builds reusable dimension/measure libraries. The examples here cover the **Engineering Velocity** subject area, powered by the GitHub Pipelines data model.
+LookML is Looker's modelling language — a YAML-like syntax that defines how Looker generates SQL, structures explores (the self-serve query interface), and builds reusable dimension/measure libraries. The examples here cover the **Engineering Velocity** subject area, powered by the GitHub Insights data model.
 
 ### Why LookML matters
 

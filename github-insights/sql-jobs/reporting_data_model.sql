@@ -1,7 +1,7 @@
 /*
   reporting_data_model.sql
   ─────────────────────────────────────────────────────────────────────────────
-  Hypothetical Showcase: Reporting layer SQL for the GitHub Pipelines platform.
+  Hypothetical Showcase: Reporting layer SQL for the GitHub Insights platform.
 
   Purpose : Build the FACT and BRIDGE tables that power engineering velocity
             dashboards — PR facts with author identity resolution, a

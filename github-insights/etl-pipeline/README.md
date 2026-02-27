@@ -1,6 +1,6 @@
-# GitHub Pipelines — ETL Pipeline
+# GitHub Insights — ETL Pipeline
 
-> **Hypothetical Showcase:** This project demonstrates Prefect-based data ingestion patterns for the GitHub Pipelines platform. All org names, tokens, and internal service references are fully anonymised. No proprietary data is included.
+> **Hypothetical Showcase:** This project demonstrates Prefect-based data ingestion patterns for the GitHub Insights platform. All org names, tokens, and internal service references are fully anonymised. No proprietary data is included.
 
 ## Overview
 

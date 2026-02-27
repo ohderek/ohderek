@@ -83,7 +83,7 @@ derek = {
 |---------|-------|------------|
 | [**NYC Taxi Lakehouse**](https://github.com/ohderek/data-engineering-portfolio/tree/main/lakehouse-medallion) | `Databricks` `Delta Lake` `PySpark` `Unity Catalog` | Bronze→Silver→Gold medallion · Auto Loader + DLT · Z-ORDER · time travel · open dataset |
 | [**Tech Health Platform**](https://github.com/ohderek/data-engineering-portfolio/tree/main/tech-health) | `Airflow` `Prefect` `dbt` `Snowflake` | Incidents + AI DX metrics · Jinja multi-workspace unions · stage-and-merge ETL framework |
-| [**GitHub Pipelines**](https://github.com/ohderek/data-engineering-portfolio/tree/main/github-analytics) | `SQL` `dbt` `Prefect` `PyArrow` | DORA ERD in raw SQL *and* dbt · 7-stage lead time pipeline · SHA + time-based deployment matching |
+| [**GitHub Insights**](https://github.com/ohderek/data-engineering-portfolio/tree/main/github-insights) | `SQL` `dbt` `Prefect` `PyArrow` | DORA ERD in raw SQL *and* dbt · 7-stage lead time pipeline · SHA + time-based deployment matching |
 | [**CoinMarketCap → Snowflake**](https://github.com/ohderek/data-engineering-portfolio/tree/main/crypto-market-data) | `Python` `httpx` `PyArrow` | Paginated REST client · 429 rate-limit handling · Parquet → Snowflake COPY+MERGE |
 | [**BI Portfolio**](https://github.com/ohderek/data-engineering-portfolio/tree/main/business-intelligence-portfolio) | `Looker` `LookML` `Tableau` | Engineering velocity LookML model · DORA dashboard-as-code · 8 public Tableau vizzes |
 
