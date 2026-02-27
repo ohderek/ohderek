@@ -1,167 +1,291 @@
 # Approach 2 — Custom Ingestion Pipeline
 
-In this approach, **you build and own the GitHub data ingestion pipeline**. A Prefect flow (or Airflow DAG) calls the GitHub REST API directly, transforms responses to Parquet, and loads them into Snowflake raw tables you define. No third-party connector required.
+In this approach, **you own the ingestion code**. A Prefect flow calls the GitHub REST API directly, transforms responses to Parquet with PyArrow, and loads them into Snowflake. No third-party connector required.
 
-The tradeoff: you write and maintain the ingestion code, handle pagination and rate limiting yourself, and manage schema evolution. In return, you get full control over schema design, sync frequency, filtering, and cost.
+Two cloud storage options are provided — **GCS** and **AWS S3**. The GitHub API calls, PyArrow transforms, and Snowflake MERGE are identical in both. Only the storage and secrets layer changes.
 
 ---
 
-## How it works
+## Architecture
 
 ```
-GitHub REST API
-  GET /orgs/{org}/pulls?state=all&sort=updated&since={lookback}
-  GET /repos/{owner}/{repo}/commits
-  GET /orgs/{org}/repos
-        │
-        │  httpx (async HTTP)
-        │  Cursor-based pagination via Link header
-        ▼
-  PyArrow Parquet transformation
-  (explicit schema, Snappy compression)
-        │
-        ▼
-  GCS staging bucket
-  gs://your-bucket/github/pull_request/org={org}/date={date}/
-        │
-        ▼
-  Snowflake COPY INTO staging table
-        │
-        ▼
-  MERGE INTO target raw table
-  (idempotent — safe to re-run)
-        │
-        ▼
-  GITHUB_PIPELINES.RAW_TABLES.*
+                        GitHub REST API
+                              │
+                   httpx (async HTTP client)
+                   cursor-based pagination (Link header)
+                              │
+                    PyArrow Parquet transform
+                    explicit schema · Snappy compression
+                    _row_key = MD5(org|repo|pr_id)
+                              │
+              ┌───────────────┴────────────────┐
+              │                                │
+     ── GCS Option ──                 ── AWS Option ──
+              │                                │
+    prefect_gcp.GcsBucket           prefect_aws.S3Bucket
+    GcsBucket.write_path()          S3Bucket.upload_from_file_object()
+              │                                │
+    gs://bucket/github/             s3://bucket/github/
+    pull_request/                   pull_request/
+    org={org}/date={date}/          org={org}/date={date}/
+              │                                │
+    Snowflake GCS Stage             Snowflake S3 Stage
+    STORAGE_INTEGRATION             STORAGE_INTEGRATION
+    (GCS service account)           (IAM role trust policy)
+              │                                │
+              └───────────────┬────────────────┘
+                              │
+                   COPY INTO staging table
+                   MERGE INTO target table     ← identical for both
+                   TRUNCATE staging
+                              │
+                   GITHUB_PIPELINES.RAW_TABLES.*
 ```
+
+---
+
+## What Changes Between GCS and AWS
+
+| | GCS Option | AWS Option |
+|---|---|---|
+| **Prefect package** | `prefect-gcp` | `prefect-aws` |
+| **Secrets block** | `GcpSecret` → GCP Secret Manager | `AwsSecret` → AWS Secrets Manager |
+| **Storage block** | `GcsBucket` | `S3Bucket` |
+| **Upload method** | `gcs.write_path(path, content=bytes)` | `s3.upload_from_file_object(BytesIO(bytes), to_path=path)` |
+| **Storage URI** | `gs://bucket/path` | `s3://bucket/path` |
+| **Snowflake auth** | GCS service account email (granted via IAM) | IAM role trust policy (ExternalId condition) |
+| **Snowflake integration** | `STORAGE_PROVIDER = 'GCS'` | `STORAGE_PROVIDER = 'S3'` |
+| **Stage setup** | Grant service account Storage Object Admin | Create IAM role + trust policy + ExternalId |
+| **COPY statement** | `FROM 'gs://...' STORAGE_INTEGRATION = gcs_integration` | `FROM 's3://...' STORAGE_INTEGRATION = s3_integration` |
+| **MERGE statement** | identical | identical |
 
 ---
 
 ## Files
 
-### [`prefect_flows/github_pr_ingestion_flow.py`](./prefect_flows/github_pr_ingestion_flow.py)
-
-A Prefect 3.x flow that ingests pull request data from one or more GitHub orgs.
-
-**Key design decisions:**
-- GitHub API token loaded from **GCP Secret Manager** via `GcpSecret.load()` — the token never touches environment variables or hardcoded config
-- Pagination uses the `Link: <url>; rel="next"` response header (cursor-based) — GitHub deprecates offset pagination for orgs with large PR volumes
-- Each batch is written to Parquet using **PyArrow with an explicit schema** — prevents type inference failures on null-heavy fields
-- GCS path is partitioned by `org=` and `date=` for efficient incremental loads
-- Snowflake load uses **COPY INTO staging → MERGE INTO target** — fully idempotent, no duplicate rows if re-run
+```
+approach-2-custom-pipeline/
+├── prefect_flows/
+│   ├── github_pr_ingestion_flow.py          GCS option (prefect-gcp)
+│   └── github_pr_ingestion_flow_aws.py      AWS option (prefect-aws)
+└── sql/
+    └── snowflake_aws_stage_setup.sql        S3 storage integration setup
+                                             (IAM role, trust policy, stage, file format)
+```
 
 ---
 
-## Raw Table Schema
+## GCS Option — `github_pr_ingestion_flow.py`
 
-The custom pipeline loads into your own schema, with naming conventions you control:
+### Full flow walkthrough
 
 ```
-GITHUB_PIPELINES.RAW_TABLES
-├── PULL_REQUEST              one row per PR per org
-├── PULL_REQUEST_REVIEW       code review submissions
-├── COMMIT_FILE               file-level diff records
-└── USER_LOOKUP               GitHub login → LDAP identity mapping
+1. GcpSecret.load("github-api-token")
+        │
+        │  Loads GitHub PAT from GCP Secret Manager.
+        │  The token never touches env vars or config files.
+        ▼
+2. httpx.Client.get("/orgs/{org}/pulls?state=all&sort=updated&since=...")
+        │
+        │  Cursor-based pagination via Link: <url>; rel="next" header.
+        │  GitHub deprecates offset pagination for large orgs.
+        │  Retries: 3 attempts, 60s delay.
+        ▼
+3. pa.Table.from_pylist(rows) → pq.write_table(table, buf, compression="snappy")
+        │
+        │  PyArrow serialises to Parquet bytes in memory.
+        │  No temp files — bytes are passed directly to the upload task.
+        ▼
+4. GcsBucket.load("gcs-data-bucket").write_path(path, content=parquet_bytes)
+        │
+        │  Path: github/pull_request/org={org}/date={date}/pull_request.parquet
+        │  Hive-style partitioning enables efficient incremental loads.
+        │  Returns: gs://bucket/github/pull_request/org=.../pull_request.parquet
+        ▼
+5. snowflake.connector.connect(private_key_path=...)
+        │
+        │  Key-pair auth — no passwords in environment variables.
+        ▼
+   COPY INTO PULL_REQUEST_STAGE
+   FROM 'gs://...'
+   STORAGE_INTEGRATION = gcs_snowflake_integration
+   FILE_FORMAT = (TYPE='PARQUET' USE_LOGICAL_TYPE=TRUE)
+        │
+        ▼
+   MERGE INTO PULL_REQUEST ON _row_key
+   UPDATE: state, updated_at, merged_at, closed_at (if _ingested_at is newer)
+   INSERT: new rows
+        │
+        ▼
+   TRUNCATE PULL_REQUEST_STAGE
 ```
 
-Column names follow `UPPER_SNAKE_CASE` Snowflake convention. Custom metadata columns added by the pipeline:
-
-- `_INGESTED_AT` — UTC timestamp when this row was loaded (equivalent to Fivetran's `_FIVETRAN_SYNCED`)
-- `_SOURCE_ORG` — the GitHub org this record came from
-- `_BATCH_ID` — UUID of the Prefect flow run that loaded this row (useful for debugging)
-
----
-
-## Setup Steps
-
-**1. Install dependencies**
+### Setup
 
 ```bash
 pip install prefect prefect-gcp httpx pyarrow snowflake-connector-python pydantic-settings
 ```
 
-**2. Create Prefect blocks (run once)**
-
 ```python
-from prefect_gcp import GcsBucket, GcpSecret
+# Create Prefect blocks once (run interactively)
+from prefect_gcp import GcsBucket
+from prefect_gcp.secret_manager import GcpSecret
 
-# GCS bucket for Parquet staging
 GcsBucket(bucket="your-data-bucket").save("gcs-data-bucket")
-
-# GitHub PAT (stored in GCP Secret Manager, not in code)
-# Create the secret in GCP first: gcloud secrets create github-api-token --data-file=token.txt
+# Create the secret in GCP first:
+# gcloud secrets create github-api-token --data-file=<(echo -n "ghp_your_token")
 GcpSecret(secret_name="github-api-token", project="your-gcp-project").save("github-api-token")
 ```
 
-**3. Configure orgs and environment**
-
 ```bash
-export GITHUB_ORGS='["my-org-1", "my-org-2"]'
-export DEPLOYMENT_ENV="prod"
+# Snowflake GCS stage setup (run once)
+# 1. Create storage integration:
+#    CREATE STORAGE INTEGRATION gcs_snowflake_integration
+#        TYPE = EXTERNAL_STAGE  STORAGE_PROVIDER = 'GCS'  ENABLED = TRUE
+#        STORAGE_ALLOWED_LOCATIONS = ('gcs://your-data-bucket/github/');
+# 2. DESC INTEGRATION gcs_snowflake_integration  → get STORAGE_GCS_SERVICE_ACCOUNT
+# 3. Grant that email Storage Object Admin on the GCS bucket
+
 export SNOWFLAKE_ACCOUNT="your-account.snowflakecomputing.com"
 export SNOWFLAKE_USER="svc_prefect"
-export SNOWFLAKE_WAREHOUSE="ETL_WH"
-export SNOWFLAKE_DATABASE="GITHUB_PIPELINES"
-export SNOWFLAKE_SCHEMA="RAW_TABLES"
-# Snowflake private key path (key-pair auth — no passwords in environment)
 export SNOWFLAKE_PRIVATE_KEY_PATH="~/.ssh/snowflake_key.p8"
-```
+export GITHUB_ORGS='["my-org-1", "my-org-2"]'
 
-**4. Run the flow**
-
-```bash
-# Ad-hoc run
 python prefect_flows/github_pr_ingestion_flow.py
 
-# Deploy to Prefect Cloud with a schedule
-prefect deploy --name github-pr-ingestion --cron "0 */6 * * *"
-```
-
-**5. Run shared downstream layers**
-
-Once `RAW_TABLES` is populated, the downstream layers are identical to Approach 1:
-
-```
-approach-2-custom-pipeline/prefect_flows/github_pr_ingestion_flow.py   ← you are here
-        ↓
-sql-jobs/reporting_data_model.sql
-        ↓
-sql-jobs/lead_time_to_deploy.sql
-        ↓
-dbt-github-insights/  (dbt transformation layer)
-```
-
-For dbt, use the custom pipeline source file:
-```bash
-cd dbt-github-insights
-# rename _sources_custom.yml → _sources.yml before running
-# or use a dbt profile var to select the source
-dbt run
+# Deploy with a schedule
+prefect deploy --name github-pr-ingestion-gcs --cron "0 */6 * * *"
 ```
 
 ---
 
-## dbt Sources (Custom Pipeline)
+## AWS Option — `github_pr_ingestion_flow_aws.py`
 
-[`../dbt-github-insights/models/staging/github/_sources_custom.yml`](../dbt-github-insights/models/staging/github/_sources_custom.yml)
+### Full flow walkthrough
 
-Key differences from the Fivetran source file:
-- `database: GITHUB_PIPELINES`, `schema: RAW_TABLES` — your own schema, not Fivetran's
-- `loaded_at_field: _ingested_at` — the custom metadata column added by the pipeline
-- Table names are `UPPER_SNAKE_CASE` (Snowflake default for unquoted identifiers)
-- No `_fivetran_deleted` or `_fivetran_synced` columns — your pipeline uses `_ingested_at` and `_batch_id` instead
+```
+1. AwsSecret.load("github-api-token-aws").read_secret()
+        │
+        │  Loads GitHub PAT from AWS Secrets Manager.
+        │  AwsSecret.read_secret() returns str directly (no .decode() needed).
+        │  Auth resolves: Prefect block credentials → env vars → EC2 instance profile.
+        ▼
+2. httpx.Client.get("/orgs/{org}/pulls?state=all&sort=updated&since=...")
+        │
+        │  [identical to GCS option]
+        ▼
+3. pa.Table.from_pylist(rows) → pq.write_table(table, buf, compression="snappy")
+        │
+        │  [identical to GCS option]
+        ▼
+4. S3Bucket.load("s3-data-bucket").upload_from_file_object(BytesIO(parquet_bytes), to_path=path)
+        │
+        │  BytesIO wrapper required — S3Bucket takes a file-like object, not raw bytes.
+        │  Path: github/pull_request/org={org}/date={date}/pull_request.parquet
+        │  Returns: s3://bucket/github/pull_request/org=.../pull_request.parquet
+        ▼
+5. snowflake.connector.connect(private_key_path=...)
+        │
+        │  [identical to GCS option — Snowflake connector is cloud-agnostic]
+        ▼
+   COPY INTO PULL_REQUEST_STAGE
+   FROM 's3://...'
+   STORAGE_INTEGRATION = s3_snowflake_integration   ← IAM role, no access keys
+   FILE_FORMAT = (TYPE='PARQUET' USE_LOGICAL_TYPE=TRUE SNAPPY_COMPRESSION=TRUE)
+        │
+        ▼
+   MERGE INTO PULL_REQUEST ON _row_key
+   [identical to GCS option]
+        │
+        ▼
+   TRUNCATE PULL_REQUEST_STAGE
+```
+
+### Setup
+
+```bash
+pip install prefect prefect-aws httpx pyarrow snowflake-connector-python pydantic-settings boto3
+```
+
+```python
+# Create Prefect blocks once
+from prefect_aws import S3Bucket
+from prefect_aws.credentials import AwsCredentials
+from prefect_aws.secrets_manager import AwsSecret
+
+# Optional: create a credentials block (or rely on env vars / instance profile)
+AwsCredentials(
+    aws_access_key_id="...",        # or leave empty to use instance profile
+    aws_secret_access_key="...",
+    region_name="us-east-1",
+).save("aws-credentials")
+
+S3Bucket(bucket_name="your-data-bucket", credentials=AwsCredentials.load("aws-credentials")).save("s3-data-bucket")
+
+# Create the secret in AWS Secrets Manager first:
+# aws secretsmanager create-secret --name github-api-token --secret-string "ghp_your_token"
+AwsSecret(secret_name="github-api-token").save("github-api-token-aws")
+```
+
+**S3 storage integration in Snowflake** — see [`sql/snowflake_aws_stage_setup.sql`](./sql/snowflake_aws_stage_setup.sql) for the full step-by-step:
+
+```
+Step 1  CREATE STORAGE INTEGRATION s3_snowflake_integration
+        STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::123456789012:role/snowflake-s3-role'
+              │
+Step 2  DESC INTEGRATION s3_snowflake_integration
+        → copy STORAGE_AWS_IAM_USER_ARN and STORAGE_AWS_EXTERNAL_ID
+              │
+Step 3  Update IAM role trust policy with those two values
+        (ExternalId condition prevents confused-deputy attacks)
+              │
+Step 4  CREATE STAGE github_s3_stage
+        URL = 's3://your-data-bucket/github/'
+        STORAGE_INTEGRATION = s3_snowflake_integration
+              │
+Step 5  LIST @github_s3_stage  ← verify access
+```
+
+```bash
+export SNOWFLAKE_ACCOUNT="your-account.snowflakecomputing.com"
+export SNOWFLAKE_USER="svc_prefect"
+export SNOWFLAKE_PRIVATE_KEY_PATH="~/.ssh/snowflake_key.p8"
+export GITHUB_ORGS='["my-org-1", "my-org-2"]'
+export S3_BUCKET_BLOCK="s3-data-bucket"
+export AWS_SECRET_BLOCK="github-api-token-aws"
+
+python prefect_flows/github_pr_ingestion_flow_aws.py
+
+# Deploy with a schedule
+prefect deploy --name github-pr-ingestion-aws --cron "0 */6 * * *"
+```
+
+---
+
+## Shared Downstream
+
+Once either flow has populated `GITHUB_PIPELINES.RAW_TABLES.*`, the downstream transformation layers are **identical**:
+
+```
+approach-2-custom-pipeline/  ← GCS or AWS, your choice
+        ↓
+../sql-jobs/reporting_data_model.sql
+        ↓
+../sql-jobs/lead_time_to_deploy.sql
+        ↓
+../dbt-github-insights/   (use _sources_custom.yml)
+```
 
 ---
 
 ## Pros and Cons
 
-| | Custom Pipeline Approach |
-|---|---|
-| **Setup time** | Hours — write, test, and deploy ingestion code |
-| **Maintenance** | You own it — GitHub API changes require code updates |
-| **Schema control** | Full — you design the table names, types, and columns |
-| **Sync frequency** | Any — run every 15 minutes if needed |
-| **Cost** | Compute only — no per-row licensing fee |
-| **Multi-org** | Loop over orgs in the same flow — no extra connectors |
-| **Historical backfill** | Manual — paginate back through the full API history |
-| **Best for** | Teams that want cost control, custom schemas, or very frequent syncs |
+| | GCS Option | AWS Option |
+|---|---|---|
+| **Best for** | GCP-native stacks | AWS-native stacks |
+| **Secret auth** | GCP Service Account | IAM role trust policy |
+| **Snowflake stage auth** | Service account email → GCS IAM | IAM role + ExternalId trust policy |
+| **Prefect block** | `prefect-gcp` | `prefect-aws` |
+| **Boto3 required** | No | Yes (boto3 / prefect-aws) |
+| **Upload method** | `write_path(path, content=bytes)` | `upload_from_file_object(BytesIO, path)` |
+| **Long-lived credentials** | No (service account key optional) | No (instance profile / role) |
