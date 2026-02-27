@@ -1,4 +1,4 @@
-# Tech Health Platform
+# Operational Performance Platform
 
 > **Hypothetical Showcase:** Demonstrates production data engineering patterns for operational health metrics — incident management, AI developer experience (AI DX), and SLO tracking. Built on Apache Airflow, dbt, and Snowflake. All company names, workspace identifiers, and credentials are fully anonymised. No proprietary data is included.
 
@@ -35,7 +35,7 @@ Source Systems
       Snowflake RAW Layer
              │
              ▼
-      dbt-tech-health
+      dbt-operational-performance
    ┌──────────────────────────────────────────────┐
    │  Staging (views)                             │
    │    stg_incident_io__companya__incidents       │
@@ -96,7 +96,7 @@ Key decisions:
 
 ---
 
-### [`dbt-tech-health/`](./dbt-tech-health)
+### [`dbt-operational-performance/`](./dbt-operational-performance)
 
 Full dbt project with staging → intermediate → marts layering, following the conventions in the [dbt best practices guide](https://docs.getdbt.com/best-practices).
 
@@ -182,10 +182,10 @@ airflow variables set SNOWFLAKE_CONN_ID "snowflake_default"
 pip install dbt-snowflake
 
 # Copy profiles.yml and update with your Snowflake credentials
-cp dbt-tech-health/profiles.yml ~/.dbt/profiles.yml
+cp dbt-operational-performance/profiles.yml ~/.dbt/profiles.yml
 
 # Install dbt packages (dbt_utils, dbt_project_evaluator)
-cd dbt-tech-health && dbt deps
+cd dbt-operational-performance && dbt deps
 
 # Run staging models first, then intermediate, then marts
 dbt run --select staging

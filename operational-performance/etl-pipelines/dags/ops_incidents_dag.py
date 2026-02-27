@@ -3,7 +3,7 @@ DAG: ops_incidents
 
 Ingests incident data from all three incident.io instances (Cash, Square, Block)
 into the Snowflake reporting layer. Runs the same SQL logic as the original
-tech-health-metrics ETL job but expressed as idempotent, observable Airflow tasks.
+operational-performance-metrics ETL job but expressed as idempotent, observable Airflow tasks.
 
 Schedule: Hourly (mirrors meta.yaml: cron 0 * * * *)
 Grain: One row per incident reference per instance
@@ -88,7 +88,7 @@ with DAG(
                     account=os.environ["SNOWFLAKE_ACCOUNT"],
                     user=os.environ["SNOWFLAKE_USER"],
                     password=os.environ["SNOWFLAKE_PASSWORD"],
-                    database=os.environ.get("SNOWFLAKE_DATABASE", "TECH_HEALTH"),
+                    database=os.environ.get("SNOWFLAKE_DATABASE", "OPS_PERFORMANCE"),
                     warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE", "COMPUTE_WH"),
                     role=os.environ.get("SNOWFLAKE_ROLE", "TRANSFORMER"),
                     session_parameters={"QUERY_TAG": f"airflow:ops_incidents:{inst}"},
@@ -230,7 +230,7 @@ with DAG(
         from src.loaders.snowflake_loader import SnowflakeLoader, SnowflakeLoaderConfig
 
         config = SnowflakeLoaderConfig(
-            database=os.environ.get("SNOWFLAKE_DATABASE", "TECH_HEALTH"),
+            database=os.environ.get("SNOWFLAKE_DATABASE", "OPS_PERFORMANCE"),
             schema="REPORTING_TABLES",
             target_table="FACT_INCIDENTS",
             merge_keys=["unique_ref"],
@@ -256,7 +256,7 @@ with DAG(
             account=os.environ["SNOWFLAKE_ACCOUNT"],
             user=os.environ["SNOWFLAKE_USER"],
             password=os.environ["SNOWFLAKE_PASSWORD"],
-            database=os.environ.get("SNOWFLAKE_DATABASE", "TECH_HEALTH"),
+            database=os.environ.get("SNOWFLAKE_DATABASE", "OPS_PERFORMANCE"),
             warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE", "COMPUTE_WH"),
         )
         cursor = conn.cursor()
@@ -291,7 +291,7 @@ with DAG(
             })
 
         config = SnowflakeLoaderConfig(
-            database=os.environ.get("SNOWFLAKE_DATABASE", "TECH_HEALTH"),
+            database=os.environ.get("SNOWFLAKE_DATABASE", "OPS_PERFORMANCE"),
             schema="REPORTING_TABLES",
             target_table="BRIDGE_INCIDENT_SERVICE",
             merge_keys=["unique_ref", "application_name"],

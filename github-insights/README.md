@@ -116,7 +116,7 @@ Stage 7  Final assembly
 
 **Matching strategy detail:** SHA matching is 100% accurate but fails when deployments don't capture commit SHAs, or when squash merges create a new SHA. The time-based fallback takes the first deployment to the service after the PR merge time — this is probabilistic (80–85% accurate for moderate-velocity services) and is flagged with `match_scenario = 'time_after_merge'` so analysts can filter it out when precision matters.
 
-**To run:** Depends on the reporting data model and a `TECH_HEALTH.REPORTING_TABLES.FACT_DEPLOYMENTS` table with deployment events. Run daily. Typically takes 5–15 minutes depending on data volume.
+**To run:** Depends on the reporting data model and a `OPS_PERFORMANCE.REPORTING_TABLES.FACT_DEPLOYMENTS` table with deployment events. Run daily. Typically takes 5–15 minutes depending on data volume.
 
 ---
 

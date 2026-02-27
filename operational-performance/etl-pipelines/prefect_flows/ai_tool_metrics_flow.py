@@ -236,7 +236,7 @@ def merge_to_snowflake(gcs_uri: str) -> dict[str, int]:
         private_key_path=os.environ["SNOWFLAKE_PRIVATE_KEY_PATH"],
         role=os.environ.get("SNOWFLAKE_ROLE", "TRANSFORMER"),
         warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE", "ETL__MEDIUM"),
-        database="TECH_HEALTH",
+        database="OPS_PERFORMANCE",
         schema=settings.snowflake_schema,
         session_parameters={"QUERY_TAG": "prefect:ai_tool_metrics"},
     )

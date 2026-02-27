@@ -2,7 +2,7 @@
 generate_schema_name
 
 Overrides the default dbt schema generation to support environment-aware
-schema naming. Matches the forge-tech-health Catalyst framework convention.
+schema naming. Matches the forge-operational-performance Catalyst framework convention.
 
 Logic:
   - If no custom schema: use target.schema (developer personal schema)

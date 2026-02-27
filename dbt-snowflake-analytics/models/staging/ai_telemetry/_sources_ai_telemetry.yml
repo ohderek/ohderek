@@ -69,7 +69,7 @@ sources:
 
   - name: ai_telemetry_reporting
     description: Intermediate reporting tables produced upstream (G2 user activity).
-    database: TECH_HEALTH
+    database: OPS_PERFORMANCE
     schema: REPORTING_TABLES
     tables:
       - name: int_g2_user_activity_daily

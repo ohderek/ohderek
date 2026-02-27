@@ -10,7 +10,7 @@ Builds the AI Developer Experience metrics tables from multiple AI tool sources:
   - Firebender     — daily usage rows
   - Amp            — daily usage rows
 
-Mirrors the tech-health-metrics ai_dx_tables ETL jobs, converted to
+Mirrors the operational-performance-metrics ai_dx_tables ETL jobs, converted to
 idempotent, observable Airflow tasks.
 
 Schedule: Daily at 16:30 UTC (mirrors meta.yaml: cron 0 14 * * *)
@@ -359,7 +359,7 @@ with DAG(
         log.info("Loading %d total AI metrics rows", len(all_records))
 
         config = SnowflakeLoaderConfig(
-            database=os.environ.get("SNOWFLAKE_DATABASE", "TECH_HEALTH"),
+            database=os.environ.get("SNOWFLAKE_DATABASE", "OPS_PERFORMANCE"),
             schema="REPORTING_TABLES",
             target_table="FACT_AI_TOOL_DAILY_METRICS",
             merge_keys=["id"],
@@ -484,7 +484,7 @@ def _get_snowflake_conn():
         account=os.environ["SNOWFLAKE_ACCOUNT"],
         user=os.environ["SNOWFLAKE_USER"],
         password=os.environ["SNOWFLAKE_PASSWORD"],
-        database=os.environ.get("SNOWFLAKE_DATABASE", "TECH_HEALTH"),
+        database=os.environ.get("SNOWFLAKE_DATABASE", "OPS_PERFORMANCE"),
         warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE", "COMPUTE_WH"),
         role=os.environ.get("SNOWFLAKE_ROLE", "TRANSFORMER"),
         session_parameters={"QUERY_TAG": "airflow:ai_dx_metrics"},

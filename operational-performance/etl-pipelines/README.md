@@ -1,4 +1,4 @@
-# Tech Health — ETL Pipelines
+# Operational Performance — ETL Pipelines
 
 > **Hypothetical Showcase:** This project demonstrates data engineering patterns for operational tech health metrics pipelines. All company names, API endpoints, credentials, and identifiers are fully anonymised or generic. No proprietary data is included.
 

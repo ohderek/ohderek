@@ -1,4 +1,4 @@
-# Tech Health — dbt
+# Operational Performance — dbt
 
 > **Hypothetical Showcase:** This dbt project demonstrates production data modelling patterns for engineering operational health metrics (incidents, SLOs, AI developer experience). All source names, company identifiers, and domains are fully anonymised. No proprietary data is included.
 

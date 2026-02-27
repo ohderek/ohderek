@@ -181,7 +181,7 @@ SELECT
   'sha_match'                                                               AS staging_match_scenario
 
 FROM pr_service_timeline pst
-JOIN TECH_HEALTH.REPORTING_TABLES.FACT_DEPLOYMENTS d
+JOIN OPS_PERFORMANCE.REPORTING_TABLES.FACT_DEPLOYMENTS d
   ON  pst.merge_commit_sha = d.git_commit_sha
   AND pst.service          = d.application
 WHERE d.environment IN ('staging', 'stage')
@@ -204,7 +204,7 @@ SELECT
   'time_after_merge'                                                        AS staging_match_scenario
 
 FROM pr_service_timeline pst
-JOIN TECH_HEALTH.REPORTING_TABLES.FACT_DEPLOYMENTS d
+JOIN OPS_PERFORMANCE.REPORTING_TABLES.FACT_DEPLOYMENTS d
   ON  pst.service = d.application
   AND d.deployment_completed_at > pst.merged_at
 WHERE d.environment IN ('staging', 'stage')
@@ -254,7 +254,7 @@ SELECT
   TIMEDIFF('DAY',   pst.first_commit_date, d.deployment_completed_at)      AS lead_time_days
 
 FROM pr_service_timeline pst
-JOIN TECH_HEALTH.REPORTING_TABLES.FACT_DEPLOYMENTS d
+JOIN OPS_PERFORMANCE.REPORTING_TABLES.FACT_DEPLOYMENTS d
   ON  pst.merge_commit_sha = d.git_commit_sha
   AND pst.service          = d.application
 WHERE d.environment = 'production'
@@ -277,7 +277,7 @@ SELECT
   TIMEDIFF('DAY',   pst.first_commit_date, d.deployment_completed_at)      AS lead_time_days
 
 FROM pr_service_timeline pst
-JOIN TECH_HEALTH.REPORTING_TABLES.FACT_DEPLOYMENTS d
+JOIN OPS_PERFORMANCE.REPORTING_TABLES.FACT_DEPLOYMENTS d
   ON  pst.service = d.application
   AND d.deployment_completed_at > pst.merged_at
 WHERE d.environment = 'production'
