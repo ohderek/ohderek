@@ -67,14 +67,6 @@ derek = {
 
 ---
 
-## Activity
-
-<div align="center">
-<img src="https://github-readme-activity-graph.vercel.app/graph?username=ohderek&bg_color=0D1117&color=00D9FF&line=64ffda&point=ffffff&area=true&area_color=00D9FF&hide_border=true" width="100%"/>
-</div>
-
----
-
 ## Featured Projects
 
 <div align="center">
