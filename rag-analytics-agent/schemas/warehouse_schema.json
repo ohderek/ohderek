@@ -1,0 +1,85 @@
+{
+  "_comment": "This file is the source of truth for what the agent knows about your data warehouse. It mirrors what you would find in a dbt manifest.json — table descriptions, column descriptions, and example questions each table can answer. The richer the descriptions, the better the agent's retrieval accuracy.",
+  "models": [
+    {
+      "name": "fct_finance__revenue",
+      "description": "Grain: one row per order line item. Tracks revenue, discounts, and refunds for every completed and cancelled order. Primary table for financial reporting and revenue analysis. Use this table when the question involves money, sales, revenue, orders, products, refunds, or discounts.",
+      "columns": [
+        {"name": "revenue_pk",        "type": "VARCHAR",  "description": "Surrogate primary key — MD5 hash of order_item_id and order_date"},
+        {"name": "order_item_id",     "type": "VARCHAR",  "description": "Natural key for the order line item"},
+        {"name": "order_id",          "type": "VARCHAR",  "description": "Parent order — multiple line items share an order_id"},
+        {"name": "order_date",        "type": "DATE",     "description": "Date the order was placed (use for daily/monthly/quarterly trends)"},
+        {"name": "customer_id",       "type": "VARCHAR",  "description": "Customer who placed the order — joins to dim_marketing__customers"},
+        {"name": "product_id",        "type": "VARCHAR",  "description": "Product purchased"},
+        {"name": "product_category",  "type": "VARCHAR",  "description": "Product category: Electronics, Apparel, Sports, Home, Health, Appliances"},
+        {"name": "region",            "type": "VARCHAR",  "description": "Geographic sales region: us-east, us-west, eu-west, eu-central, ap-southeast"},
+        {"name": "quantity",          "type": "INTEGER",  "description": "Number of units ordered on this line item"},
+        {"name": "unit_price",        "type": "FLOAT",    "description": "Price per unit at time of order (may differ from current catalogue price)"},
+        {"name": "gross_line_amount", "type": "FLOAT",    "description": "unit_price multiplied by quantity, before any discounts"},
+        {"name": "discount_amount",   "type": "FLOAT",    "description": "Discount applied to this line item in currency"},
+        {"name": "net_line_amount",   "type": "FLOAT",    "description": "Gross minus discount — the actual revenue recognised. Zero if refunded."},
+        {"name": "status",            "type": "VARCHAR",  "description": "Order line status: completed, cancelled, refunded, pending"},
+        {"name": "is_refunded",       "type": "BOOLEAN",  "description": "True if this line item was refunded"},
+        {"name": "refund_amount",     "type": "FLOAT",    "description": "Amount refunded in currency. Zero if not refunded."}
+      ],
+      "sample_questions": [
+        "What is total revenue by region last month?",
+        "Which product category has the highest refund rate?",
+        "Show me daily revenue trend for the last 30 days",
+        "What is the average order value by region?",
+        "How much discount are we giving away per category?"
+      ]
+    },
+    {
+      "name": "dim_marketing__customers",
+      "description": "Grain: one row per customer (current snapshot). Fully denormalised customer dimension with behavioural attributes and segmentation tier. Use this table when the question involves customers, segments, churn, lifetime value, acquisition channels, or customer behaviour.",
+      "columns": [
+        {"name": "customer_id",           "type": "VARCHAR",  "description": "Natural customer identifier — primary key, joins to fct_finance__revenue"},
+        {"name": "email_hash",            "type": "VARCHAR",  "description": "SHA256 hash of email address — PII-safe identifier for matching"},
+        {"name": "region",                "type": "VARCHAR",  "description": "Customer's home region: us-east, us-west, eu-west, eu-central, ap-southeast"},
+        {"name": "signup_date",           "type": "DATE",     "description": "Date the customer first registered"},
+        {"name": "total_orders",          "type": "INTEGER",  "description": "Lifetime number of completed orders placed"},
+        {"name": "lifetime_revenue",      "type": "FLOAT",    "description": "Total net revenue from this customer across all time"},
+        {"name": "avg_order_value",       "type": "FLOAT",    "description": "Average net revenue per order for this customer"},
+        {"name": "last_order_date",       "type": "DATE",     "description": "Most recent completed order date"},
+        {"name": "days_since_last_order", "type": "INTEGER",  "description": "Days elapsed since last order — high values indicate churn risk"},
+        {"name": "order_tier",            "type": "VARCHAR",  "description": "Segmentation tier: champion (10+ orders AND $1000+ LTV), loyal (5+ orders AND $500+), repeat (2+ orders), one_time"},
+        {"name": "is_churned",            "type": "BOOLEAN",  "description": "True if no order in the last 90 days"},
+        {"name": "refund_rate",           "type": "FLOAT",    "description": "Ratio of refunded to completed orders for this customer"},
+        {"name": "preferred_category",    "type": "VARCHAR",  "description": "Product category this customer spends most on"},
+        {"name": "acquisition_channel",   "type": "VARCHAR",  "description": "How the customer was acquired: organic, paid_search, social, referral, email"}
+      ],
+      "sample_questions": [
+        "How many churned customers do we have by region?",
+        "What is the breakdown of customers by order tier?",
+        "Which acquisition channel produces the highest lifetime value customers?",
+        "What percentage of customers have churned?",
+        "Show me average lifetime revenue by acquisition channel"
+      ]
+    },
+    {
+      "name": "fct_ops__incidents",
+      "description": "Grain: one row per incident. Tracks operational incidents including severity, resolution time, SLA compliance, and affected services. Use this table when the question involves reliability, incidents, MTTR, SLA breaches, P1/P2 severity, or service health.",
+      "columns": [
+        {"name": "incident_id",          "type": "VARCHAR",   "description": "Unique incident identifier"},
+        {"name": "created_at",           "type": "TIMESTAMP", "description": "When the incident was opened"},
+        {"name": "resolved_at",          "type": "TIMESTAMP", "description": "When the incident was marked resolved. NULL if still open."},
+        {"name": "severity",             "type": "VARCHAR",   "description": "Severity level: P1 (critical outage), P2 (major degradation), P3 (minor), P4 (informational)"},
+        {"name": "service",              "type": "VARCHAR",   "description": "Affected service: checkout, payments, auth, search, recommendations, notifications, inventory, data-pipeline"},
+        {"name": "team",                 "type": "VARCHAR",   "description": "Team responsible for resolution: platform, commerce, data, security, infrastructure"},
+        {"name": "resolution_minutes",   "type": "INTEGER",   "description": "Minutes from incident open to resolved. NULL if still open."},
+        {"name": "is_resolved",          "type": "BOOLEAN",   "description": "True if incident has been closed"},
+        {"name": "root_cause_category",  "type": "VARCHAR",   "description": "Root cause: infrastructure, code_deployment, external_dependency, configuration, unknown"},
+        {"name": "mttr_minutes",         "type": "INTEGER",   "description": "Mean time to resolve in minutes — the DORA reliability metric"},
+        {"name": "breach_sla",           "type": "BOOLEAN",   "description": "True if resolution time exceeded the SLA threshold for this severity level"}
+      ],
+      "sample_questions": [
+        "What is our average MTTR for P1 incidents this year?",
+        "Which team has the most SLA breaches?",
+        "What is the most common root cause category?",
+        "How many open incidents do we have right now?",
+        "Show incident volume by severity and month"
+      ]
+    }
+  ]
+}

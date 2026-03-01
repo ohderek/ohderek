@@ -198,6 +198,21 @@ Databricks-native pattern — Auto Loader handles exactly-once file ingestion; D
 
 ---
 
+### ◆ Natural Language → SQL (Generative AI)
+
+```mermaid
+flowchart LR
+    Q["User Question\n(plain English)"] -->|embed + cosine search| C[("ChromaDB\nSchema Index")] -->|top 2 schema chunks| G["GPT-4o\nSQL Generation"] --> V["Validator\nSELECT-only · LIMIT"] --> D["DuckDB\nor Snowflake"] -->|results| F["GPT-4o\nAnswer Formatting"] --> R["JSON Response\nSQL + Answer + Latency"]
+```
+
+RAG pipeline over a data warehouse — schema embedded once into ChromaDB, retrieved per query. Two GPT-4o calls: one generates SQL, one formats the answer. Validated, logged, and dual-backend (DuckDB mock or Snowflake production).
+
+| Project | Stack | Highlights |
+|---|---|---|
+| [**RAG Analytics Agent**](https://github.com/ohderek/data-engineering-portfolio/tree/main/rag-analytics-agent) | `GPT-4o` `ChromaDB` `FastAPI` `DuckDB` `Snowflake` | Schema retrieval · SQL validation · dual backend · observability logging |
+
+---
+
 ### ◆ Business Intelligence
 
 | Project | Stack | Highlights |
