@@ -1,49 +1,61 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=0d0d0d&height=180&text=Crypto+Market+Data&fontSize=54&fontColor=ff6b35&fontAlignY=52&animation=fadeIn&desc=REST+API+%C2%B7+PyArrow+%C2%B7+Snowflake&descSize=19&descAlignY=75&descColor=c9a84c" />
+<img src="https://capsule-render.vercel.app/api?type=rect&color=0d0d0d&height=180&text=Crypto+Intelligence+Agent&fontSize=46&fontColor=ff6b35&fontAlignY=52&animation=fadeIn&desc=CoinMarketCap+%C2%B7+Snowflake+%C2%B7+RAG+%C2%B7+GPT-4o+%C2%B7+Streamlit&descSize=19&descAlignY=75&descColor=c9a84c" />
 
 <br/>
 
-<img src="https://readme-typing-svg.demolab.com?font=IBM+Plex+Mono&weight=600&size=19&duration=3200&pause=900&color=ff6b35&center=true&vCenter=true&width=700&height=45&lines=REST+API+%E2%86%92+Parquet+%E2%86%92+Snowflake.+Every+time.;429+rate-limit%3A+handled.+5xx%3A+retried.;Top+5%2C000+coins.+Daily+snapshot.+Idempotent.;Explicit+schema.+Zero+type+inference." alt="Typing SVG" />
+<img src="https://readme-typing-svg.demolab.com?font=IBM+Plex+Mono&weight=600&size=19&duration=3200&pause=900&color=ff6b35&center=true&vCenter=true&width=700&height=45&lines=REST+API+%E2%86%92+Parquet+%E2%86%92+Snowflake.+Idempotent.;%22What+is+the+price+of+Bitcoin%3F%22+%E2%86%92+SQL+%E2%86%92+answer.;Schema+indexed+once.+Retrieved+per+query.;Pipeline+writes.+Agent+reads.+Same+database." alt="Typing SVG" />
 
 </div>
 
 <br/>
 
-> **Hypothetical Showcase** — demonstrates REST API ingestion, Parquet serialisation, and idempotent Snowflake loading. All credentials are environment-variable driven.
+> **Hypothetical Showcase** — end-to-end crypto market platform: a data pipeline that ingests CoinMarketCap data into Snowflake, and a natural language agent that lets anyone query it in plain English. The pipeline and the agent share one thing — the database.
 
 ---
 
 ## ◈ Architecture
 
+Two independent layers share one database. The pipeline writes; the agent reads.
+
 ```mermaid
 flowchart LR
-    subgraph SRC["CoinMarketCap Pro API"]
-        A["/listings/latest\npaginated · up to 5,000 coins"]
-        B["/global-metrics/quotes/latest\nsingle snapshot"]
+    subgraph INGEST["Layer 1 — Data Pipeline  (main.py)"]
+        direction TB
+        A["CoinMarketCap\nPro API"] -->|"httpx · retry · 429 back-off"| B["PyArrow\nexplicit schema → Parquet"]
+        B -->|"PUT to internal stage"| C["Snowflake\n@crypto_stage"]
+        C -->|"COPY INTO · MERGE on id+fetched_at"| D[("ANALYTICS views\ncurrent_top_10\ndaily_coin_prices\nprice_history_7d\nbtc_dominance_trend")]
     end
 
-    subgraph ETL["Python ETL"]
-        C["httpx Client\nretry · 429 back-off"]
-        D["PyArrow\nexplicit schema → Parquet bytes"]
+    subgraph AGENT["Layer 2 — Intelligence Agent  (agent/)"]
+        direction TB
+        S["crypto_schema.json\ntable + column descriptions"] -->|"embed once · persist to disk"| V["ChromaDB\nVector Index"]
+        Q["User Question\n(plain English)"] -->|"embed + cosine search"| V
+        V -->|"top 2 relevant schema chunks"| G["GPT-4o\nSQL generation  temp=0"]
+        G -->|"SELECT-only · LIMIT guard"| D
+        D -->|"result rows"| F["GPT-4o\nAnswer formatting  temp=0.2"]
     end
 
-    subgraph SF["Snowflake"]
-        E["@crypto_stage\ninternal stage"]
-        F["STAGING tables\nCOPY INTO · PURGE=TRUE"]
-        G[("TARGET tables\nMERGE on id + fetched_at")]
-        H["ANALYTICS views\n4 pre-aggregated views"]
-        E -->|COPY INTO| F -->|MERGE| G --> H
+    subgraph UI["Layer 3 — User Interface"]
+        T["Terminal\n--interactive"]
+        ST["Streamlit\nbrowser chat"]
+        API["FastAPI\nREST endpoint"]
     end
 
-    A & B --> C -->|dataclasses| D -->|PUT Parquet| E
+    F --> T & ST & API
 ```
 
-Both datasets — coin listings and global metrics — follow the same four-step pipeline: fetch → type-safe dataclasses → Parquet → stage-and-merge. Running the pipeline multiple times per day builds a historical series for trending.
+**Layer 1** runs on a schedule (cron / Airflow). Every run appends a fresh snapshot. The analytics views always reflect the latest data.
+
+**Layer 2** is stateless and event-driven — it runs on demand when a question arrives. The ChromaDB index is built once from `crypto_schema.json` and reused for every query.
+
+**Layer 3** is interchangeable — the agent logic is identical regardless of whether the question arrives from a terminal, a browser, or an API call.
 
 ---
 
 ## ◈ Tech Stack
+
+**Data Pipeline**
 
 <div align="center">
 
@@ -52,6 +64,17 @@ Both datasets — coin listings and global metrics — follow the same four-step
 ![Apache Parquet](https://img.shields.io/badge/Apache_Parquet-50ABF1?style=for-the-badge&logoColor=white)
 ![httpx](https://img.shields.io/badge/httpx-0d0d0d?style=for-the-badge&logoColor=ff6b35)
 ![PyArrow](https://img.shields.io/badge/PyArrow-0d0d0d?style=for-the-badge&logoColor=c9a84c)
+
+</div>
+
+**Intelligence Agent**
+
+<div align="center">
+
+![OpenAI](https://img.shields.io/badge/OpenAI_GPT--4o-412991?style=for-the-badge&logo=openai&logoColor=white)
+![ChromaDB](https://img.shields.io/badge/ChromaDB-FF6B35?style=for-the-badge&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)
+![DuckDB](https://img.shields.io/badge/DuckDB-FFC107?style=for-the-badge&logoColor=black)
 
 </div>
 

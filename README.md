@@ -148,7 +148,7 @@ Custom ingestion where connector coverage is limited or latency requirements are
 
 | Project | Stack | Highlights |
 |---|---|---|
-| [**CoinMarketCap → Snowflake**](https://github.com/ohderek/data-engineering-portfolio/tree/main/crypto-market-data) | `Python` `httpx` `PyArrow` `Prefect` | Paginated REST · 429 rate-limit handling · Parquet → COPY+MERGE |
+| [**Crypto Intelligence Agent**](https://github.com/ohderek/data-engineering-portfolio/tree/main/crypto-intelligence-agent) | `Python` `httpx` `PyArrow` `Snowflake` `GPT-4o` `ChromaDB` `Streamlit` | REST → Parquet → Snowflake · RAG agent · natural language querying · Streamlit chat UI |
 | [**Operational Performance**](https://github.com/ohderek/data-engineering-portfolio/tree/main/operational-performance) | `Airflow` `Prefect` `dbt` `Snowflake` | Incident + AI DX metrics · Jinja multi-workspace unions · stage-and-merge ETL |
 
 ---
