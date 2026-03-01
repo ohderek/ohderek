@@ -307,9 +307,9 @@ flowchart LR
         sn1["SCD Type 2\nfrom staging only"]
     end
 
-    STG -->|ref() only| INT
-    STG -->|ref() only| SNAP
-    INT -->|ref() only| MART
+    STG -->|ref only| INT
+    STG -->|ref only| SNAP
+    INT -->|ref only| MART
     MART --> BI["BI Tools\nAnalysts"]
 ```
 
