@@ -50,6 +50,57 @@ Both approaches produce identically-structured raw tables — all downstream dbt
 
 ---
 
+## ◈ Tech Stack
+
+<div align="center">
+
+![Prefect](https://img.shields.io/badge/Prefect-024DFD?style=for-the-badge&logo=prefect&logoColor=white)
+![dbt](https://img.shields.io/badge/dbt-FF694B?style=for-the-badge&logo=dbt&logoColor=white)
+![Snowflake](https://img.shields.io/badge/Snowflake-29B5E8?style=for-the-badge&logo=snowflake&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Apache Parquet](https://img.shields.io/badge/Apache_Parquet-50ABF1?style=for-the-badge&logoColor=white)
+![GCP](https://img.shields.io/badge/GCP-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white)
+
+</div>
+
+---
+
+## ◈ Credentials
+
+All secrets are injected at runtime — no credentials in code or version control. See [CREDENTIALS.md](../CREDENTIALS.md) for key-pair setup, Cloud Secrets Managers, and CI/CD patterns.
+
+**Approach 1 (Fivetran):** credentials are configured in the Fivetran UI — no secrets in this codebase.
+
+**Approach 2 (Custom Pipeline) — Prefect Secret Blocks:**
+
+```python
+# Store once (run interactively or in a setup script)
+import asyncio
+from prefect.blocks.system import Secret
+
+asyncio.run(Secret(value="ghp_xxxxxxxxxxxx").save("github-token"))
+```
+
+```python
+# Reference in flow — value fetched at runtime, never logged or serialised
+github_token = await Secret.load("github-token")
+```
+
+**Snowflake and GCS environment variables:**
+
+```bash
+# .env (never committed)
+SNOWFLAKE_ACCOUNT=xy12345.us-east-1
+SNOWFLAKE_USER=etl_user
+SNOWFLAKE_PRIVATE_KEY_PATH=/path/to/rsa_key.p8
+GCS_BUCKET=your-github-insights-bucket
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+```
+
+Snowflake uses **key-pair auth**. GCS uses a service account JSON — reference its path via `GOOGLE_APPLICATION_CREDENTIALS`, which the GCS client library reads automatically.
+
+---
+
 ## ◈ Two Ingestion Approaches
 
 | | Approach 1 — Fivetran | Approach 2 — Custom Pipeline |
@@ -181,19 +232,6 @@ github-insights/
 ```
 
 ---
-
-## ◈ Tech Stack
-
-<div align="center">
-
-![Prefect](https://img.shields.io/badge/Prefect-024DFD?style=for-the-badge&logo=prefect&logoColor=white)
-![dbt](https://img.shields.io/badge/dbt-FF694B?style=for-the-badge&logo=dbt&logoColor=white)
-![Snowflake](https://img.shields.io/badge/Snowflake-29B5E8?style=for-the-badge&logo=snowflake&logoColor=white)
-![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![Apache Parquet](https://img.shields.io/badge/Apache_Parquet-50ABF1?style=for-the-badge&logoColor=white)
-![GCP](https://img.shields.io/badge/GCP-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white)
-
-</div>
 
 ---
 

@@ -52,6 +52,52 @@ Data flows from three Incident.io workspaces and seven AI tool APIs through Airf
 
 ---
 
+## ◈ Tech Stack
+
+<div align="center">
+
+![Apache Airflow](https://img.shields.io/badge/Apache_Airflow-017CEE?style=for-the-badge&logo=apacheairflow&logoColor=white)
+![dbt](https://img.shields.io/badge/dbt-FF694B?style=for-the-badge&logo=dbt&logoColor=white)
+![Snowflake](https://img.shields.io/badge/Snowflake-29B5E8?style=for-the-badge&logo=snowflake&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)
+
+</div>
+
+---
+
+## ◈ Credentials
+
+All secrets are managed through Airflow — never hardcoded in DAG files. See [CREDENTIALS.md](../CREDENTIALS.md) for Airflow Secrets Backends, key-pair setup, and CI/CD patterns.
+
+**Snowflake — Airflow Connection (encrypted at rest in Airflow metadata DB):**
+
+```bash
+airflow connections add snowflake_default \
+    --conn-type  snowflake \
+    --conn-host  your-account.snowflakecomputing.com \
+    --conn-login etl_user \
+    --conn-extra '{"private_key_path": "/secrets/rsa_key.p8", "role": "TRANSFORMER"}'
+```
+
+**API keys — Airflow Variables:**
+
+```bash
+airflow variables set INCIDENT_IO_API_KEY   "your-key"
+airflow variables set AI_GATEWAY_API_KEY    "your-key"
+airflow variables set SNOWFLAKE_CONN_ID     "snowflake_default"
+```
+
+```python
+# In DAG code — fetched at task execution time, never hardcoded
+from airflow.models import Variable
+api_key = Variable.get("INCIDENT_IO_API_KEY")
+```
+
+For keys that should never appear in the Airflow UI, configure a [Secrets Backend](https://airflow.apache.org/docs/apache-airflow/stable/security/secrets/secrets-backend/index.html) (AWS SSM, GCP Secret Manager, or HashiCorp Vault) — Airflow fetches at execution time without storing locally.
+
+---
+
 ## ◈ Quick Start
 
 **Prerequisites:** Python 3.11+ · Apache Airflow 2.9 · dbt-snowflake · Snowflake account
@@ -172,18 +218,6 @@ Same pattern used in `int_ai_telemetry__tool_daily_metrics` over 7 AI tools.
 | Dynamic warehouse sizing | Mart configs | `ETL_SMALL` for incremental, `ETL_MEDIUM` for full refresh — right-size compute |
 
 ---
-
-## ◈ Tech Stack
-
-<div align="center">
-
-![Apache Airflow](https://img.shields.io/badge/Apache_Airflow-017CEE?style=for-the-badge&logo=apacheairflow&logoColor=white)
-![dbt](https://img.shields.io/badge/dbt-FF694B?style=for-the-badge&logo=dbt&logoColor=white)
-![Snowflake](https://img.shields.io/badge/Snowflake-29B5E8?style=for-the-badge&logo=snowflake&logoColor=white)
-![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)
-
-</div>
 
 ---
 

@@ -51,6 +51,70 @@ E-commerce and ops source data flows through three strictly-separated dbt layers
 
 ---
 
+## ◈ Tech Stack
+
+<div align="center">
+
+![dbt](https://img.shields.io/badge/dbt-FF694B?style=for-the-badge&logo=dbt&logoColor=white)
+![Snowflake](https://img.shields.io/badge/Snowflake-29B5E8?style=for-the-badge&logo=snowflake&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)
+![SQL](https://img.shields.io/badge/SQL-4479A1?style=for-the-badge&logo=postgresql&logoColor=white)
+
+</div>
+
+---
+
+## ◈ Credentials
+
+`profiles.yml` is never committed — it reads all Snowflake credentials from the environment at dbt invocation time. See [CREDENTIALS.md](../CREDENTIALS.md) for key-pair setup, GitHub Actions patterns, and Cloud Secrets Managers.
+
+```yaml
+# ~/.dbt/profiles.yml  (outside the project directory, never in git)
+analytics:
+  target: dev
+  outputs:
+    dev:
+      type:             snowflake
+      account:          "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user:             "{{ env_var('SNOWFLAKE_USER') }}"
+      private_key_path: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PATH') }}"
+      role:             "{{ env_var('SNOWFLAKE_ROLE', 'TRANSFORMER') }}"
+      warehouse:        "{{ env_var('SNOWFLAKE_WAREHOUSE', 'ADHOC__MEDIUM') }}"
+      database:         ANALYTICS
+      schema:           "sandbox_{{ env_var('DBT_USER', 'dev') }}"
+      threads:          4
+    prod:
+      type:             snowflake
+      account:          "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user:             svc_dbt
+      private_key_path: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PATH') }}"
+      role:             TRANSFORMER
+      warehouse:        ETL__LARGE
+      database:         ANALYTICS
+      schema:           ANALYTICS
+      threads:          8
+```
+
+The `env_var('KEY', 'default')` two-argument form provides a fallback — optional config like role and warehouse don't break the profile when unset.
+
+**GitHub Actions** — store the private key contents (base64-encoded) as a repository secret, decode to a temp file at job start:
+
+```yaml
+env:
+  SNOWFLAKE_ACCOUNT:         ${{ secrets.SNOWFLAKE_ACCOUNT }}
+  SNOWFLAKE_USER:            ${{ secrets.SNOWFLAKE_USER }}
+  SNOWFLAKE_PRIVATE_KEY_B64: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_B64 }}
+steps:
+  - name: Decode private key
+    run: |
+      echo "$SNOWFLAKE_PRIVATE_KEY_B64" | base64 -d > /tmp/rsa_key.p8
+      echo "SNOWFLAKE_PRIVATE_KEY_PATH=/tmp/rsa_key.p8" >> $GITHUB_ENV
+  - run: dbt build --target ci --defer --state ./prod-artifacts
+```
+
+---
+
 ## ◈ Quick Start
 
 **Prerequisites:** Python 3.9+ · `dbt-snowflake` · Snowflake account with key-pair auth
@@ -252,18 +316,6 @@ where net_line_amount > gross_line_amount
 | `safe_divide` | `IFF(denominator = 0, NULL, numerator / denominator)` |
 
 ---
-
-## ◈ Tech Stack
-
-<div align="center">
-
-![dbt](https://img.shields.io/badge/dbt-FF694B?style=for-the-badge&logo=dbt&logoColor=white)
-![Snowflake](https://img.shields.io/badge/Snowflake-29B5E8?style=for-the-badge&logo=snowflake&logoColor=white)
-![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)
-![SQL](https://img.shields.io/badge/SQL-4479A1?style=for-the-badge&logo=postgresql&logoColor=white)
-
-</div>
 
 ---
 

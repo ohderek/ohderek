@@ -46,6 +46,53 @@ The producer simulates an e-commerce order feed. Spark consumes it via Structure
 
 ---
 
+## ◈ Tech Stack
+
+<div align="center">
+
+![Apache Kafka](https://img.shields.io/badge/Apache_Kafka-231F20?style=for-the-badge&logo=apachekafka&logoColor=white)
+![Apache Spark](https://img.shields.io/badge/Apache_Spark-E25A1C?style=for-the-badge&logo=apachespark&logoColor=white)
+![Delta Lake](https://img.shields.io/badge/Delta_Lake-00ADD4?style=for-the-badge&logo=delta&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+
+</div>
+
+---
+
+## ◈ Credentials
+
+**Local dev:** no external credentials required — Kafka runs entirely inside Docker.
+
+**Production Kafka** (Confluent Cloud / Amazon MSK / self-hosted with SASL): inject broker credentials via environment variables, never in source code or `docker-compose.yml`:
+
+```bash
+# .env (never committed)
+KAFKA_BOOTSTRAP_SERVERS=pkc-xxxx.us-east-1.aws.confluent.cloud:9092
+KAFKA_SASL_USERNAME=your-api-key
+KAFKA_SASL_PASSWORD=your-api-secret
+```
+
+```python
+# spark/streaming_consumer.py — production Kafka config
+(
+    spark.readStream
+    .format("kafka")
+    .option("kafka.bootstrap.servers",    os.environ["KAFKA_BOOTSTRAP_SERVERS"])
+    .option("kafka.security.protocol",    "SASL_SSL")
+    .option("kafka.sasl.mechanism",       "PLAIN")
+    .option("kafka.sasl.jaas.config",
+        f"org.apache.kafka.common.security.plain.PlainLoginModule required "
+        f"username='{os.environ[\"KAFKA_SASL_USERNAME\"]}' "
+        f"password='{os.environ[\"KAFKA_SASL_PASSWORD\"]}';")
+    ...
+)
+```
+
+For managed Spark (Databricks / EMR), store the SASL credentials in the cluster's secret scope (Databricks Secrets or AWS Secrets Manager) and reference them via `dbutils.secrets.get()` or SSM — not as plain environment variables on shared compute. See [CREDENTIALS.md](../CREDENTIALS.md) for Cloud Secrets Manager patterns.
+
+---
+
 ## ◈ Quick Start
 
 **Prerequisites:** Docker · Python 3.10+ · Java 11+ · Apache Spark 3.5 (`spark-submit` in PATH)
@@ -242,18 +289,6 @@ spark.read.format("delta").load("./delta/gold/order_revenue_windows") \
 ```
 
 ---
-
-## ◈ Tech Stack
-
-<div align="center">
-
-![Apache Kafka](https://img.shields.io/badge/Apache_Kafka-231F20?style=for-the-badge&logo=apachekafka&logoColor=white)
-![Apache Spark](https://img.shields.io/badge/Apache_Spark-E25A1C?style=for-the-badge&logo=apachespark&logoColor=white)
-![Delta Lake](https://img.shields.io/badge/Delta_Lake-00ADD4?style=for-the-badge&logo=delta&logoColor=white)
-![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-
-</div>
 
 ---
 

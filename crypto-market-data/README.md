@@ -43,6 +43,41 @@ Both datasets — coin listings and global metrics — follow the same four-step
 
 ---
 
+## ◈ Tech Stack
+
+<div align="center">
+
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Snowflake](https://img.shields.io/badge/Snowflake-29B5E8?style=for-the-badge&logo=snowflake&logoColor=white)
+![Apache Parquet](https://img.shields.io/badge/Apache_Parquet-50ABF1?style=for-the-badge&logoColor=white)
+![httpx](https://img.shields.io/badge/httpx-0d0d0d?style=for-the-badge&logoColor=ff6b35)
+![PyArrow](https://img.shields.io/badge/PyArrow-0d0d0d?style=for-the-badge&logoColor=c9a84c)
+
+</div>
+
+---
+
+## ◈ Credentials
+
+All secrets are injected via environment variables — no credentials in code or version control. See [CREDENTIALS.md](../CREDENTIALS.md) for Snowflake key-pair setup, Cloud Secrets Managers, and CI/CD patterns.
+
+```bash
+# .env (never committed — add *.env and *.p8 to .gitignore)
+CMC_API_KEY=your-coinmarketcap-pro-api-key
+SNOWFLAKE_ACCOUNT=xy12345.us-east-1
+SNOWFLAKE_USER=etl_user
+SNOWFLAKE_PRIVATE_KEY_PATH=/path/to/rsa_key.p8
+SNOWFLAKE_ROLE=TRANSFORMER        # optional, default: TRANSFORMER
+SNOWFLAKE_WAREHOUSE=CRYPTO_WH     # optional, default: CRYPTO_WH
+SNOWFLAKE_DATABASE=CRYPTO         # optional, default: CRYPTO
+```
+
+The code uses `os.environ["KEY"]` throughout — missing credentials raise a `KeyError` at startup rather than producing a silent `None` five steps into the pipeline.
+
+Snowflake uses **key-pair auth** over password: the private key can't be captured in query logs, rotates independently of password policy, and works cleanly in service account contexts.
+
+---
+
 ## ◈ Quick Start
 
 **Prerequisites:** Python 3.11+ · CoinMarketCap Pro API key · Snowflake account with key-pair auth
@@ -158,18 +193,6 @@ ORDER BY price_date;
 | `CLUSTER BY DATE(FETCHED_AT)` | Micro-partition pruning: `WHERE fetched_at >= ...` scans only relevant partitions |
 
 ---
-
-## ◈ Tech Stack
-
-<div align="center">
-
-![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![Snowflake](https://img.shields.io/badge/Snowflake-29B5E8?style=for-the-badge&logo=snowflake&logoColor=white)
-![Apache Parquet](https://img.shields.io/badge/Apache_Parquet-50ABF1?style=for-the-badge&logoColor=white)
-![httpx](https://img.shields.io/badge/httpx-0d0d0d?style=for-the-badge&logoColor=ff6b35)
-![PyArrow](https://img.shields.io/badge/PyArrow-0d0d0d?style=for-the-badge&logoColor=c9a84c)
-
-</div>
 
 ---
 

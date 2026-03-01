@@ -44,6 +44,53 @@ Two deployment options: **notebook pipeline** (step-by-step, ideal for learning)
 
 ---
 
+## ◈ Tech Stack
+
+<div align="center">
+
+![Databricks](https://img.shields.io/badge/Databricks-FF3621?style=for-the-badge&logo=databricks&logoColor=white)
+![Delta Lake](https://img.shields.io/badge/Delta_Lake-00ADD4?style=for-the-badge&logo=delta&logoColor=white)
+![Apache Spark](https://img.shields.io/badge/Apache_Spark-E25A1C?style=for-the-badge&logo=apachespark&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+
+</div>
+
+---
+
+## ◈ Credentials
+
+No external API keys required — the NYC TLC dataset is public and downloads without authentication. See [CREDENTIALS.md](../CREDENTIALS.md) for service principal setup and CI/CD patterns.
+
+**Local dev / notebooks — Personal Access Token:**
+
+```bash
+# .env (never committed)
+DATABRICKS_HOST=https://your-workspace.azuredatabricks.net
+DATABRICKS_TOKEN=dapiXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+# Or configure the Databricks CLI profile
+databricks configure --token
+```
+
+**Production / CI/CD — Service Principal (OAuth M2M):**
+
+Preferred over PATs for automation. PATs are tied to a personal user account and become invalid on offboarding. Service principals are workspace-scoped and survive any user changes.
+
+```bash
+# Azure AD service principal
+ARM_CLIENT_ID=your-app-id
+ARM_CLIENT_SECRET=your-client-secret
+ARM_TENANT_ID=your-tenant-id
+```
+
+```yaml
+# databricks.yml (Asset Bundle) — references env vars, no inline secrets
+workspace:
+  host: ${DATABRICKS_HOST}
+```
+
+---
+
 ## ◈ Quick Start
 
 **Prerequisites:** Databricks workspace with Unity Catalog · Runtime 14.3+ · ~500 MB storage
@@ -173,17 +220,6 @@ Violating rows are silently quarantined to the DLT system table. Tracked in the 
 | Cash | 891,204 | $14.20 | 0.0% |
 
 ---
-
-## ◈ Tech Stack
-
-<div align="center">
-
-![Databricks](https://img.shields.io/badge/Databricks-FF3621?style=for-the-badge&logo=databricks&logoColor=white)
-![Delta Lake](https://img.shields.io/badge/Delta_Lake-00ADD4?style=for-the-badge&logo=delta&logoColor=white)
-![Apache Spark](https://img.shields.io/badge/Apache_Spark-E25A1C?style=for-the-badge&logo=apachespark&logoColor=white)
-![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
-
-</div>
 
 ---
 
