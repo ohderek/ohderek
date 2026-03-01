@@ -1,222 +1,189 @@
-# CoinMarketCap → Snowflake
+<div align="center">
 
-> **Hypothetical Showcase:** Demonstrates REST API scraping, response normalisation, Parquet serialisation, and idempotent Snowflake ingestion. Uses the public CoinMarketCap Pro API. All credentials are environment-variable driven — no secrets in code.
+<img src="https://capsule-render.vercel.app/api?type=rect&color=0d0d0d&height=180&text=Crypto+Market+Data&fontSize=54&fontColor=ff6b35&fontAlignY=52&animation=fadeIn&desc=REST+API+%C2%B7+PyArrow+%C2%B7+Snowflake&descSize=19&descAlignY=75&descColor=c9a84c" />
 
----
+<br/>
 
-## What it does
+<img src="https://readme-typing-svg.demolab.com?font=IBM+Plex+Mono&weight=600&size=19&duration=3200&pause=900&color=ff6b35&center=true&vCenter=true&width=700&height=45&lines=REST+API+%E2%86%92+Parquet+%E2%86%92+Snowflake.+Every+time.;429+rate-limit%3A+handled.+5xx%3A+retried.;Top+5%2C000+coins.+Daily+snapshot.+Idempotent.;Explicit+schema.+Zero+type+inference." alt="Typing SVG" />
 
-Pulls live cryptocurrency market data from the [CoinMarketCap Pro API](https://coinmarketcap.com/api/) and loads it into Snowflake in two datasets:
+</div>
 
-| Dataset | API Endpoint | What's captured |
-|---------|-------------|-----------------|
-| **Coin listings** | `/v1/cryptocurrency/listings/latest` | Price, 24h volume, market cap, % changes (1h/24h/7d/30d), circulating supply, CMC rank — for the top N coins |
-| **Global metrics** | `/v1/global-metrics/quotes/latest` | Total crypto market cap, BTC/ETH dominance, active coins and exchanges |
+<br/>
 
-Both datasets are loaded as timestamped snapshots, so running the pipeline multiple times per day builds a historical series you can trend over time.
+> **Hypothetical Showcase** — demonstrates REST API ingestion, Parquet serialisation, and idempotent Snowflake loading. All credentials are environment-variable driven.
 
 ---
 
-## Pipeline Flow
+## ◈ Architecture
 
+```mermaid
+flowchart LR
+    subgraph SRC["CoinMarketCap Pro API"]
+        A["/listings/latest\npaginated · up to 5,000 coins"]
+        B["/global-metrics/quotes/latest\nsingle snapshot"]
+    end
+
+    subgraph ETL["Python ETL"]
+        C["httpx Client\nretry · 429 back-off"]
+        D["PyArrow\nexplicit schema → Parquet bytes"]
+    end
+
+    subgraph SF["Snowflake"]
+        E["@crypto_stage\ninternal stage"]
+        F["STAGING tables\nCOPY INTO · PURGE=TRUE"]
+        G[("TARGET tables\nMERGE on id + fetched_at")]
+        H["ANALYTICS views\n4 pre-aggregated views"]
+        E -->|COPY INTO| F -->|MERGE| G --> H
+    end
+
+    A & B --> C -->|dataclasses| D -->|PUT Parquet| E
 ```
-CoinMarketCap Pro API
-        │
-        │  GET /v1/cryptocurrency/listings/latest  (paginated, up to 5,000 coins)
-        │  GET /v1/global-metrics/quotes/latest    (single snapshot)
-        ▼
-src/coinmarketcap_client.py
-  ├── Paginates using start-offset loop (CMC caps at 5,000 per call)
-  ├── Injects API key via X-CMC_PRO_API_KEY header (never in query params)
-  ├── Detects 429 rate-limit responses, waits Retry-After seconds
-  ├── Retries up to 4× on 5xx with exponential back-off (2s, 4s, 8s, 16s)
-  └── Returns typed Python dataclasses (CoinListing, GlobalMetrics)
-        │
-        ▼
-src/transform.py
-  ├── Maps dataclasses → explicit PyArrow schema (float64, int32, bool, string)
-  ├── Enforces schema at write time — type mismatches raise before hitting Snowflake
-  └── Serialises to Parquet with Snappy compression → in-memory bytes buffer
-        │
-        ▼
-src/snowflake_loader.py
-  ├── PUT Parquet file to internal @crypto_stage
-  ├── COPY INTO staging table (MATCH_BY_COLUMN_NAME, PURGE=TRUE)
-  ├── MERGE INTO target table on (id, fetched_at) — idempotent upsert
-  └── TRUNCATE staging table → clean slate for next run
-        │
-        ▼
-CRYPTO.RAW.CMC_LISTINGS          one row per (coin, snapshot)
-CRYPTO.RAW.CMC_GLOBAL_METRICS    one row per snapshot
-        │
-        ▼
-CRYPTO.ANALYTICS.*               pre-aggregated views for dashboards
-```
+
+Both datasets — coin listings and global metrics — follow the same four-step pipeline: fetch → type-safe dataclasses → Parquet → stage-and-merge. Running the pipeline multiple times per day builds a historical series for trending.
 
 ---
 
-## Project Structure
+## ◈ Quick Start
 
-```
-crypto-market-data/
-├── main.py                       Orchestration entry point — runs extract → transform → load
-│                                 Accepts --limit and --no-global-metrics CLI flags
-├── requirements.txt              httpx, pyarrow, snowflake-connector-python
-├── src/
-│   ├── coinmarketcap_client.py   API client
-│   │     • CoinMarketCapClient class
-│   │     • listings_pages() generator — yields one page of CoinListing objects per API call
-│   │     • global_metrics() — returns a single GlobalMetrics snapshot
-│   │     • _get() — shared HTTP logic: headers, retry, back-off
-│   │     • CoinListing / GlobalMetrics dataclasses — typed, serialisable with asdict()
-│   │
-│   ├── transform.py              Serialisation layer
-│   │     • LISTINGS_SCHEMA / GLOBAL_METRICS_SCHEMA — explicit PyArrow schemas
-│   │     • listings_to_parquet() — list[CoinListing] → Parquet bytes
-│   │     • global_metrics_to_parquet() — GlobalMetrics → Parquet bytes
-│   │
-│   └── snowflake_loader.py       Snowflake ingest layer
-│         • SnowflakeLoader class (context manager — auto-closes connection)
-│         • load_listings() — upserts coin snapshot data
-│         • load_global_metrics() — upserts global metrics snapshot
-│         • _stage_and_merge() — shared PUT → COPY INTO → MERGE → TRUNCATE logic
-│
-└── sql/
-    └── create_tables.sql         Run once to set up Snowflake objects
-          • @crypto_stage (internal stage)
-          • CMC_LISTINGS + CMC_LISTINGS_STAGE tables
-          • CMC_GLOBAL_METRICS + CMC_GLOBAL_METRICS_STAGE tables
-          • Four analytics views (see below)
-```
-
----
-
-## How to Implement
-
-### 1. Prerequisites
-
-- Python 3.11+
-- A [CoinMarketCap Pro API key](https://coinmarketcap.com/api/) (free tier gives 10,000 credits/month — enough for daily top-500 runs)
-- A Snowflake account with a user configured for key-pair authentication
-
-### 2. Snowflake setup
-
-Run `sql/create_tables.sql` once against your Snowflake account to create the database, schemas, stage, tables, and analytics views:
-
-```sql
--- In Snowflake worksheet or SnowSQL:
-USE ROLE SYSADMIN;
-CREATE DATABASE IF NOT EXISTS CRYPTO;
-CREATE SCHEMA IF NOT EXISTS CRYPTO.RAW;
-CREATE SCHEMA IF NOT EXISTS CRYPTO.ANALYTICS;
-
--- Then run the full contents of sql/create_tables.sql
-```
-
-### 3. Snowflake key-pair authentication
+**Prerequisites:** Python 3.11+ · CoinMarketCap Pro API key · Snowflake account with key-pair auth
 
 ```bash
-# Generate RSA key pair (no passphrase for service accounts)
-openssl genrsa -out rsa_key.pem 2048
-openssl rsa -in rsa_key.pem -pubout -out rsa_key.pub.pem
-openssl pkcs8 -topk8 -inform PEM -outform DER -nocrypt \
-  -in rsa_key.pem -out rsa_key.p8
+# 1. Create Snowflake objects (run once)
+#    Execute sql/create_tables.sql in your Snowflake worksheet
 
-# Assign public key to your Snowflake user
-ALTER USER etl_user SET RSA_PUBLIC_KEY='<contents of rsa_key.pub.pem>';
-```
-
-### 4. Environment variables
-
-```bash
+# 2. Set environment variables
 export CMC_API_KEY="your-coinmarketcap-pro-api-key"
-export SNOWFLAKE_ACCOUNT="xy12345.us-east-1"       # from your Snowflake URL
+export SNOWFLAKE_ACCOUNT="xy12345.us-east-1"
 export SNOWFLAKE_USER="etl_user"
 export SNOWFLAKE_PRIVATE_KEY_PATH="/path/to/rsa_key.p8"
-export SNOWFLAKE_ROLE="TRANSFORMER"                 # optional, default: TRANSFORMER
-export SNOWFLAKE_WAREHOUSE="CRYPTO_WH"              # optional, default: CRYPTO_WH
-export SNOWFLAKE_DATABASE="CRYPTO"                  # optional, default: CRYPTO
-export SNOWFLAKE_SCHEMA="RAW"                       # optional, default: RAW
-```
 
-### 5. Install and run
-
-```bash
+# 3. Install and run
 pip install -r requirements.txt
-
-# Fetch top 500 coins + global metrics (default)
-python main.py
-
-# Fetch top 5,000 coins
-python main.py --limit 5000
-
-# Listings only, skip global metrics
+python main.py                   # top 500 coins + global metrics
+python main.py --limit 5000      # full top-5,000 run
 python main.py --no-global-metrics
 ```
 
-### 6. Schedule it
+---
 
-Wire into any scheduler — the pipeline is fully idempotent (safe to re-run):
+## ◈ How It Works
+
+### API Client — `src/coinmarketcap_client.py`
+
+CMC caps listings at 5,000 rows per call. The client uses a `start`-offset pagination loop, incrementing by `batch_size` until `limit` coins are fetched or the API returns fewer rows than requested.
 
 ```python
-# Airflow DAG example
-from airflow.operators.bash import BashOperator
+# Auth via header — never query params (avoids server logs / browser history)
+headers = {"X-CMC_PRO_API_KEY": os.environ["CMC_API_KEY"]}
 
-fetch_crypto = BashOperator(
-    task_id="fetch_coinmarketcap",
-    bash_command="python /opt/crypto-market-data/main.py --limit 500",
-    env={"CMC_API_KEY": "{{ var.value.cmc_api_key }}", ...},
-    dag=dag,
-)
+# 429 handling — sleep exactly Retry-After seconds (preserves credit budget)
+if response.status_code == 429:
+    wait = int(response.headers.get("Retry-After", 60))
+    time.sleep(wait)
 ```
 
----
+Retries up to 4× on 5xx with exponential back-off: 2s → 4s → 8s → 16s.
 
-## Snowflake Analytics Layer
+### Schema & Serialisation — `src/transform.py`
 
-After loading, four views make the data immediately queryable for dashboards:
+Responses are mapped to typed Python dataclasses (`CoinListing`, `GlobalMetrics`) then serialised to Parquet via an **explicit PyArrow schema**. Without it, `pa.Table.from_pylist` infers types from the first row — a `None` price on coin #1 would infer `null` type and break all subsequent rows.
 
-| View | Grain | Description |
-|------|-------|-------------|
-| `ANALYTICS.DAILY_COIN_PRICES` | (coin, date) | Latest snapshot per coin per calendar day — `QUALIFY ROW_NUMBER()` dedup picks the last fetch |
-| `ANALYTICS.CURRENT_TOP_10` | coin | Top 10 coins by CMC rank at the most recent fetch timestamp |
-| `ANALYTICS.PRICE_HISTORY_7D` | (coin, date) | Daily OHLC + max volume per coin for the trailing 7 days |
-| `ANALYTICS.BTC_DOMINANCE_TREND` | date | Daily avg BTC/ETH dominance, total market cap (in trillions), 24h volume |
+```python
+LISTINGS_SCHEMA = pa.schema([
+    ("id",             pa.int64()),
+    ("symbol",         pa.string()),
+    ("price_usd",      pa.float64()),
+    ("market_cap_usd", pa.float64()),
+    ("change_24h_pct", pa.float64()),
+    ("fetched_at",     pa.timestamp("us", tz="UTC")),
+    ...
+])
+```
+
+### Snowflake Loader — `src/snowflake_loader.py`
+
+The `_stage_and_merge` method handles all four steps atomically:
 
 ```sql
--- 7-day price history for Bitcoin
-SELECT price_date, avg_price_usd, high_price_usd, low_price_usd, max_volume_usd
+PUT file://buffer.parquet @crypto_stage;
+COPY INTO cmc_listings_stage FROM @crypto_stage
+    FILE_FORMAT = (TYPE = PARQUET MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE)
+    PURGE = TRUE;
+MERGE INTO cmc_listings t USING cmc_listings_stage s
+    ON t.id = s.id AND t.fetched_at = s.fetched_at
+    WHEN MATCHED THEN UPDATE ...
+    WHEN NOT MATCHED THEN INSERT ...;
+TRUNCATE TABLE cmc_listings_stage;
+```
+
+`MERGE ON (id, fetched_at)` allows multiple daily snapshots while preventing duplicates on re-run. `CLUSTER BY DATE(FETCHED_AT)` on the target table enables micro-partition pruning for date-range queries.
+
+---
+
+## ◈ Data Model
+
+| Table | Grain | Description |
+|---|---|---|
+| `CRYPTO.RAW.CMC_LISTINGS` | coin × snapshot | Price, volume, market cap, % changes (1h/24h/7d/30d), CMC rank |
+| `CRYPTO.RAW.CMC_GLOBAL_METRICS` | snapshot | Total market cap, BTC/ETH dominance, active exchanges |
+
+**Analytics views** — queryable immediately after load:
+
+| View | Grain | Description |
+|---|---|---|
+| `ANALYTICS.DAILY_COIN_PRICES` | coin × date | Latest snapshot per coin per day — `QUALIFY ROW_NUMBER()` dedup |
+| `ANALYTICS.CURRENT_TOP_10` | coin | Top 10 by CMC rank at latest fetch |
+| `ANALYTICS.PRICE_HISTORY_7D` | coin × date | Daily OHLC + max volume, trailing 7 days |
+| `ANALYTICS.BTC_DOMINANCE_TREND` | date | Daily avg BTC/ETH dominance, total market cap (trillions) |
+
+```sql
+-- 7-day Bitcoin price history
+SELECT price_date, avg_price_usd, high_price_usd, low_price_usd
 FROM CRYPTO.ANALYTICS.PRICE_HISTORY_7D
-WHERE SYMBOL = 'BTC'
+WHERE symbol = 'BTC'
 ORDER BY price_date;
-
--- Current market snapshot: top 10
-SELECT rank, symbol, price_usd, market_cap_usd, change_24h_pct
-FROM CRYPTO.ANALYTICS.CURRENT_TOP_10;
-
--- Bitcoin dominance over the last 30 days
-SELECT metric_date, avg_btc_dominance_pct, avg_total_mcap_trillion_usd
-FROM CRYPTO.ANALYTICS.BTC_DOMINANCE_TREND
-WHERE metric_date >= DATEADD('day', -30, CURRENT_DATE())
-ORDER BY metric_date;
 ```
 
 ---
 
-## Key Design Decisions
+## ◈ Key Design Decisions
 
-| Decision | Reasoning |
-|----------|-----------|
-| `start`-offset pagination | CMC's listings endpoint caps at 5,000 rows per call. The loop increments `start` by `batch_size` until `limit` coins are fetched or the API returns fewer rows than requested. |
-| `X-CMC_PRO_API_KEY` header (not query param) | CMC recommends header-based auth — query params can appear in server logs and browser history. |
-| Respect `Retry-After` on 429 | CMC measures usage in credits. When rate-limited, the response includes how long to wait — sleeping exactly that long avoids burning retry credits unnecessarily. |
-| Explicit PyArrow schema | Without a schema, `pa.Table.from_pylist` infers types from the first row. A `None` price on coin #1 would infer `null` type, causing a schema mismatch on all subsequent rows. |
-| Parquet + Snowflake COPY INTO | Snowflake's COPY INTO is the fastest ingest path — it parallelises the load server-side. Parquet's columnar encoding also compresses float-heavy price data better than CSV. |
-| MERGE on `(id, fetched_at)` | Allows multiple snapshots per coin per day (hourly runs) while preventing duplicates if the same run executes twice. |
-| `CLUSTER BY DATE(FETCHED_AT)` | Micro-partition pruning for date-range queries. A `WHERE fetched_at >= ...` on a clustered table scans only relevant partitions instead of the full table. |
+| Decision | Rationale |
+|---|---|
+| Header-based API auth | `X-CMC_PRO_API_KEY` doesn't appear in server logs or browser history |
+| Respect `Retry-After` on 429 | CMC bills by credit; sleeping exactly the specified duration avoids burning retry credits |
+| Explicit PyArrow schema | Prevents `None`-inferred null types from breaking Parquet serialisation on the first row |
+| Parquet + `COPY INTO` | Snowflake's fastest ingest path; parallelises server-side; columnar encoding compresses float-heavy price data better than CSV |
+| `MERGE ON (id, fetched_at)` | Allows multiple daily snapshots (hourly runs) while remaining idempotent — re-running the same batch is safe |
+| `CLUSTER BY DATE(FETCHED_AT)` | Micro-partition pruning: `WHERE fetched_at >= ...` scans only relevant partitions |
 
 ---
 
-## Tech Stack
+## ◈ Tech Stack
 
-`Python 3.11` · `httpx` · `PyArrow` · `Snowflake` · `CoinMarketCap Pro API`
+<div align="center">
+
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Snowflake](https://img.shields.io/badge/Snowflake-29B5E8?style=for-the-badge&logo=snowflake&logoColor=white)
+![Apache Parquet](https://img.shields.io/badge/Apache_Parquet-50ABF1?style=for-the-badge&logoColor=white)
+![httpx](https://img.shields.io/badge/httpx-0d0d0d?style=for-the-badge&logoColor=ff6b35)
+![PyArrow](https://img.shields.io/badge/PyArrow-0d0d0d?style=for-the-badge&logoColor=c9a84c)
+
+</div>
+
+---
+
+<div align="center">
+
+<a href="https://www.linkedin.com/in/derek-o-halloran/">
+  <img src="https://img.shields.io/badge/LINKEDIN-0d0d0d?style=for-the-badge&logo=linkedin&logoColor=ff6b35" />
+</a>&nbsp;
+<a href="https://github.com/ohderek/data-engineering-portfolio">
+  <img src="https://img.shields.io/badge/DATA_PORTFOLIO-0d0d0d?style=for-the-badge&logo=github&logoColor=ff6b35" />
+</a>
+
+<br/><br/>
+
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0,0d0d0d,100,1a1a2e&height=100&section=footer" />
+
+</div>
